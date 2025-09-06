@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html style="overflow: hidden; position: fixed; width: 100%; height: 100%;">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>XiaoZhi WebRTC - Main</title>
+    <link rel="icon" type="image/x-icon" href="static/favicon.ico">
+    <script src="static/js/vue.min.js"></script>
+    <!-- Live2D Cubism Core -->
+    <script src="static/js/live2dcubismcore.min.js"></script>
+    <!-- PIXI.js -->
+    <script src="static/js/pixi.js"></script>
+    <!-- pixi-live2d-display  UMD 构建 -->
+    <script src="static/js/cubism4.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f1e6aa;
+            color: #333;
+            height: 100vh;
+            height: 100dvh; /* 动态视口高度，更适合移动端 */
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        #app {
+            height: 100vh;
+            height: 100dvh; /* 动态视口高度 */
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .main-page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh; /* 动态视口高度 */
+            opacity: 1;
+            transform: translateY(0);
+            overflow: hidden;
+        }
+
+        .chat-container {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh; /* 动态视口高度 */
+            background: #f1e6aa;
+            position: relative;
+            overflow: hidden;
+        }
+
+
+        /* Live2D Canvas */
+        #live2d-stage {
+            position: fixed;
+            inset: 0;
+            display: block;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .status-indicator {
+            color: #333;
+            font-size: 18px;
+            font-weight: 500;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator.speaking {
+            color: #06ae56;
+        }
+
+        .status-indicator.listening {
+            color: #2980b9;
+        }
+
+        .message-bubbles-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            max-height: 80%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1000;
+            pointer-events: auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            transform: translateX(0);
+            opacity: 1;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        .message-bubbles-container.hidden {
+            transform: translateX(100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .message-bubbles-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 滚动指示器 */
+        .scroll-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .message-bubbles-container:hover .scroll-indicator,
+        .message-bubbles-container.scrollable .scroll-indicator {
+            opacity: 1;
+        }
+
+        .message-bubble {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 16px;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+            font-size: 14px;
+            line-height: 1.4;
+            word-break: break-word;
+            max-width: 100%;
+            animation: bubbleSlideIn 0.4s ease-out;
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+        }
+
+        .message-bubble.user {
+            background: rgba(149, 236, 105, 0.95);
+            color: #333;
+            align-self: flex-end;
+            margin-left: 40px;
+        }
+
+        .message-bubble.assistant {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            align-self: flex-start;
+            margin-right: 40px;
+        }
+
+        @keyframes bubbleSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Loading overlay for /api/offer */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-box {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #07C160;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Local preview video - draggable */
+        .local-preview {
+            position: fixed;
+            width: 240px;
+            height: 135px;
+            background: #000;
+            z-index: 2000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+            object-fit: cover;
+            cursor: move;
+            touch-action: none;
+            user-select: none;
+            transition: transform 0.1s ease-out;
+        }
+
+        .local-preview.dragging {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+            z-index: 2001;
+        }
+
+        /* Mobile responsive styles for local-preview */
+        @media (max-width: 768px) {
+            .local-preview {
+                width: 135px;
+                height: 240px;
+                cursor: grab;
+            }
+
+            .local-preview.dragging {
+                cursor: grabbing;
+            }
+
+            /* 移动端消息容器样式调整 */
+            .message-bubbles-container {
+                width: 280px;
+                right: 10px;
+                bottom: 10px;
+                max-height: 60%;
+            }
+
+            .message-bubble {
+                font-size: 13px;
+                padding: 10px 14px;
+                border-radius: 16px;
+            }
+
+            /* 确保移动端不出现滚动 */
+            html, body {
+                overflow: hidden !important;
+                position: fixed !important;
+                width: 100% !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+            }
+
+            #app {
+                touch-action: pan-x pan-y; /* 允许水平和垂直平移，但防止缩放 */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="main-page">
+
+            <!-- Status indicator -->
+            <div class="chat-container">
+                <div class="loading-overlay" v-if="isLoadingOffer">
+                    <div class="loading-box">
+                        <div class="spinner"></div>
+                        <div>正在建立连接…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video elements -->
+            <div>
+                <video ref="remoteVideo" autoplay :muted="false" playsinline style="position:absolute;width:0;height:0;opacity:0;left:-9999px;top:-9999px;"></video>
+                <video ref="localVideo"
+                       class="local-preview"
+                       :class="{ dragging: isDragging }"
+                       :style="{ left: videoPosition.x + 'px', top: videoPosition.y + 'px' }"
+                       @touchstart="handleTouchStart"
+                       @touchmove="handleTouchMove"
+                       @touchend="handleTouchEnd"
+                       @mousedown="handleMouseDown"
+                       @mousemove="handleMouseMove"
+                       @mouseup="handleMouseUp"
+                       autoplay
+                       :muted="true"
+                       playsinline></video>
+            </div>
+
+
+            <!-- Live2D Canvas -->
+            <canvas id="live2d-stage"></canvas>
+
+            <!-- Message bubbles -->
+            <div class="message-bubbles-container"
+                 :class="{ hidden: isMessageHidden, scrollable: hasScrollableContent }"
+                 @touchstart="handleMessageContainerTouchStart"
+                 @touchmove="handleMessageContainerTouchMove"
+                 @touchend="handleMessageContainerTouchEnd"
+                 @scroll="handleMessageScroll">
+                <div class="scroll-indicator" v-if="hasScrollableContent">↕</div>
+                <div v-for="(message, index) in displayMessages" :key="index"
+                    :class="['message-bubble', message.role === 'user' ? 'user' : 'assistant']">
+                    {{ message.content }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function getQueryParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || '';
+        }
+
+        new Vue({
+            el: '#app',
+            data: {
+                pc: null,
+                localStream: null,
+                remoteStream: null,
+                isStarted: false,
+                isConnected: false,
+                status: null,
+                dataChannel: null,
+                messages: [],
+                open_xiaozhi_url: true,
+                maxMessages: 50,
+                macAddress: '',
+                speakingState: 'listening',
+                currentAudio: null,
+                isLoadingOffer: false,
+                live2dApp: null,
+                live2dModel: null,
+                isTalking: false,
+                mouthAnimationId: null,
+                mouthParam: 'ParamMouthOpenY',
+                audioContext: null,
+                analyser: null,
+                dataArray: null,
+                // 拖拽相关状态
+                isDragging: false,
+                dragStart: { x: 0, y: 0 },
+                videoPosition: { x: 16, y: 16 },
+                videoOffset: { x: 0, y: 0 },
+                // 消息容器滑动手势相关状态
+                isMessageHidden: false,
+                swipeStartX: 0,
+                swipeStartY: 0,
+                swipeStartTime: 0,
+                isSwipeGesture: false,
+                minSwipeDistance: 50,
+                maxSwipeTime: 300,
+                // 消息容器触摸状态
+                isMessageContainerTouching: false,
+                messageScrollStartY: 0,
+                messageScrollStartX: 0,
+                messageScrollStartTime: 0,
+                hasScrollableContent: false,
+                isVerticalScrolling: false
+            },
+            mounted() {
+                this.macAddress = getQueryParam('mac');
+                this.initializeMedia().then(() => {
+                    this.start();
+                });
+                this.initializeLive2D();
+                this.setInitialVideoPosition();
+
+                // 监听窗口大小变化
+                window.addEventListener('resize', this.handleWindowResize);
+                window.addEventListener('orientationchange', this.handleOrientationChange);
+
+                // 添加全局滑动手势监听器（仅在移动设备上）
+                if (window.innerWidth <= 768) {
+                    document.addEventListener('touchstart', this.handleGlobalTouchStart, { passive: false });
+                    document.addEventListener('touchmove', this.handleGlobalTouchMove, { passive: false });
+                    document.addEventListener('touchend', this.handleGlobalTouchEnd, { passive: false });
+                }
+            },
+            beforeDestroy() {
+                // 清理事件监听器
+                window.removeEventListener('resize', this.handleWindowResize);
+                window.removeEventListener('orientationchange', this.handleOrientationChange);
+
+                // 清理滑动手势监听器
+                document.removeEventListener('touchstart', this.handleGlobalTouchStart);
+                document.removeEventListener('touchmove', this.handleGlobalTouchMove);
+                document.removeEventListener('touchend', this.handleGlobalTouchEnd);
+            },
+            computed: {
+                displayMessages() {
+                    return this.messages.slice(-this.maxMessages);
+                },
+            },
+            watch: {
+                messages: {
+                    handler() {
+                        this.checkScrollableContent();
+                    },
+                    deep: true
+                }
+            },
+            methods: {
+                animateMouth() {
+                  if (!this.isTalking) return;
+                  const internal = this.live2dModel.internalModel;
+                  if (internal && internal.coreModel) {
+                    const coreModel = internal.coreModel;
+
+                    // 获取音频分贝值
+                    let mouthValue = 0;
+                    if (this.analyser && this.dataArray) {
+                      this.analyser.getByteFrequencyData(this.dataArray);
+                      const average = this.dataArray.reduce((a, b) => a + b) / this.dataArray.length;
+                      // 将0-255的值转换为0-1的范围，并应用一些平滑处理
+                      mouthValue = Math.min(1, (average / 255) * 3);
+                    }
+                    // console.log("mouthValue", mouthValue)
+                    coreModel.setParameterValueById(this.mouthParam, mouthValue);
+                    coreModel.update();
+                  }
+                  this.mouthAnimationId = requestAnimationFrame(this.animateMouth);
+                },
+
+                // live2d 开始说话
+                startTalking() {
+                  if (this.isTalking || !this.live2dModel) return;
+
+                  // 确保音频分析器已初始化
+                  if (!this.analyser && this.remoteStream) {
+                    this.initializeAudioAnalyzer();
+                  }
+
+                  this.isTalking = true;
+                  this.animateMouth();
+                },
+
+                // live2d 停止说话
+                stopTalking() {
+                  this.isTalking = false;
+                  if (this.mouthAnimationId) {
+                    cancelAnimationFrame(this.mouthAnimationId);
+                    this.mouthAnimationId = null;
+                  }
+                  const internal = this.live2dModel.internalModel;
+                  if (internal && internal.coreModel) {
+                    const coreModel = internal.coreModel;
+                    coreModel.setParameterValueById(this.mouthParam, 0);
+                    coreModel.update();
+                  }
+                },
+
+                async initializeLive2D() {
+                    try {
+                        const canvas = document.getElementById('live2d-stage');
+
+                        // 供内部使用
+                        window.PIXI = PIXI;
+
+                        this.live2dApp = new PIXI.Application({
+                            view: canvas,
+                            height: window.innerHeight,
+                            width: window.innerWidth,
+                            resolution: window.devicePixelRatio,
+                            autoDensity: true,
+                            antialias: true,
+                            backgroundAlpha: 0,
+                        });
+
+                        // 加载 Live2D 模型
+                        this.live2dModel = await PIXI.live2d.Live2DModel.from('static/hiyori_pro_zh/runtime/hiyori_pro_t11.model3.json');
+                        this.live2dApp.stage.addChild(this.live2dModel);
+                        this.live2dModel.scale.set(0.35);
+                        this.live2dModel.x = (window.innerWidth - this.live2dModel.width) * 0.5;
+                        this.live2dModel.y = -50;
+
+                    } catch (err) {
+                        console.error('加载 Live2D 模型失败:', err);
+                    }
+                },
+                async initializeMedia() {
+                    try {
+                        this.localStream = await navigator.mediaDevices.getUserMedia({
+                            video: { width: 640, height: 480 },
+                            audio: {
+                                    echoCancellation: true,
+                                    echoCancellationType: "browser", // 使用浏览器内置回声消除，通常更稳定
+                                    noiseSuppression: true,
+                                    autoGainControl: true,
+                                    latency: 0.02, // 降低延迟到20ms
+                                    sampleRate: 48000,
+                                    sampleSize: 16,
+                                    channelCount: 1
+                                },
+                        });
+                    } catch (error) {
+                        console.error('Error accessing media devices:', error);
+                    }
+                },
+                scrollToBottom() {
+                    this.$nextTick(() => {
+                        const container = document.querySelector('.message-bubbles-container');
+                        if (container && !this.isMessageHidden) {
+                            // 平滑滚动到底部
+                            container.scrollTo({
+                                top: container.scrollHeight,
+                                behavior: 'smooth'
+                            });
+                        }
+                        this.checkScrollableContent();
+                    });
+                },
+
+                checkScrollableContent() {
+                    this.$nextTick(() => {
+                        const container = document.querySelector('.message-bubbles-container');
+                        if (container) {
+                            this.hasScrollableContent = container.scrollHeight > container.clientHeight;
+                        }
+                    });
+                },
+
+                handleMessageScroll(event) {
+                    // 滚动时更新滚动状态
+                    this.checkScrollableContent();
+                },
+                async negotiate() {
+                    try {
+                        if (!this.pc) return;
+
+                        // 创建 offer
+                        const offer = await this.pc.createOffer();
+                        if (!this.pc) return;
+
+                        await this.pc.setLocalDescription(offer);
+
+                        // 优化：不等待ICE收集完成，直接发送offer
+                        // 这可以显著减少连接建立时间
+
+                        if (!this.pc) return;
+                        this.isLoadingOffer = true;
+
+                        const response = await fetch('/api/offer', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sdp: this.pc.localDescription.sdp,
+                                type: this.pc.localDescription.type,
+                                macAddress: this.macAddress,
+                            })
+                        });
+
+                        const answer = await response.json();
+                        if (!this.pc) return;
+
+                        await this.pc.setRemoteDescription(answer);
+
+                    } catch (error) {
+                        console.error('Error during negotiation:', error);
+                        alert('Error during negotiation: ' + error.message);
+                    } finally {
+                        // this.isLoadingOffer = false;
+                    }
+                },
+                setupDataChannel() {
+                    this.dataChannel = this.pc.createDataChannel('chat');
+                    this.dataChannel.onopen = () => { console.log('Data channel is open'); };
+                    this.dataChannel.onmessage = (event) => {
+                        this.messages.push(event.data);
+                        this.$nextTick(() => { this.scrollToBottom(); });
+                    };
+                    this.dataChannel.onclose = () => { console.log('Data channel closed'); };
+                    this.pc.ondatachannel = (event) => {
+                        const channel = event.channel;
+                        channel.onmessage = (e) => {
+                            const data = JSON.parse(e.data);
+                            // console.log("data", data)
+                            if (data["type"] == "tts" && data["state"] == "sentence_start") {
+                                this.speakingState = "speaking";
+                            } else {
+                                this.speakingState = "listening";
+                            }
+                            if (data["type"] === "music") {
+                                this.playMusicUrl(data["url"]);
+                            }
+                            if (data["type"] === "websocket" && data["state"] === "close") {
+
+                                this.messages.push({"role": "assistant", "content": "连接已断开"});
+                                this.dataChannel.close();
+                                this.pc.close();
+                                this.endAndBack();
+                                return;
+                            }
+                            if (data["type"] === "stt") {
+                                this.messages.push({ "role": "user", "content": data["text"] });
+                            } else if (data["type"] === "tts" && data["state"] === "sentence_start") {
+                                this.messages.push({ "role": "assistant", "content": data["text"] });
+                                if (data["text"].includes("请登录到控制面板添加设备，输入验证码：") && this.open_xiaozhi_url) {
+                                    window.open("https://xiaozhi.me/console", "_blank");
+                                    this.open_xiaozhi_url = false;
+                                }
+                            } else if (data["type"] === "tool") {
+                                if (data["text"] === "set_volume") {
+                                    this.$refs.remoteVideo.volume = Math.max(0, Math.min(1, data["value"] / 100));
+                                } else if (data["text"] === "open_tab") {
+                                    window.open(data["value"], "_blank");
+                                } else if (data["text"] === "stop_music") {
+                                    this.stopMusic();
+                                }
+                            } else {
+                                console.log("unknown type:", data["type"]);
+                            }
+                            this.$nextTick(() => { this.scrollToBottom(); });
+                        };
+                    };
+                },
+                start() {
+                    if (this.pc) {
+                        this.stop();
+                    }
+
+                    // 优化ICE配置：禁用STUN服务器，使用直连模式
+                    const iceConfig = {
+                        iceServers: [],  // 空数组，不使用任何STUN/TURN服务器
+                        iceCandidatePoolSize: 0,  // 不预先收集候选者
+                        iceTransportPolicy: 'all'  // 允许所有传输类型
+                    };
+
+                    this.pc = new RTCPeerConnection(iceConfig);
+                    this.status = "connecting...";
+                    this.setupDataChannel();
+                    this.localStream.getAudioTracks().forEach(track => { this.pc.addTrack(track, this.localStream); });
+                    this.localStream.getVideoTracks().forEach(track => { this.pc.addTrack(track, this.localStream); });
+                    this.pc.addEventListener('track', (evt) => {
+                        // 只处理音频轨道，忽略视频轨道
+                        if (evt.track.kind === 'audio') {
+                            this.remoteStream = evt.streams[0];
+                            this.$nextTick(() => { this.assignVideoStreams(); });
+                        }
+                    });
+                    this.pc.addEventListener('connectionstatechange', () => {
+                        this.status = this.pc.connectionState;
+                        if (this.pc.connectionState === 'connected') {
+                            this.stopTalking();
+                            this.startTalking()
+                            this.isConnected = true;
+                            this.isLoadingOffer = false;
+                            this.$nextTick(() => { this.assignVideoStreams(); });
+                        }
+                    });
+                    this.isStarted = true;
+                    this.negotiate();
+                },
+                stop() {
+                    this.isStarted = false;
+                    this.isConnected = false;
+                    this.status = null;
+                    if (this.$refs.remoteVideo) { this.$refs.remoteVideo.srcObject = null; }
+                    if (this.$refs.localVideo) { this.$refs.localVideo.srcObject = null; }
+                    this.remoteStream = null;
+                    if (this.dataChannel) { this.dataChannel.close(); this.dataChannel = null; }
+                    if (this.pc) { this.pc.close(); this.pc = null; }
+
+                    // 清理音频分析器
+                    if (this.audioContext) {
+                        this.audioContext.close();
+                        this.audioContext = null;
+                    }
+                    this.analyser = null;
+                    this.dataArray = null;
+                },
+                endAndBack() {
+                    this.stop();
+                    // window.location.href = '/';
+                },
+
+                assignVideoStreams() {
+                    const remoteVideo = this.$refs.remoteVideo;
+                    const localVideo = this.$refs.localVideo;
+                    if (!remoteVideo || !localVideo) { return; }
+
+                    localVideo.style.display = 'block';
+
+                    if (this.remoteStream) {
+                        remoteVideo.srcObject = this.remoteStream;
+                        remoteVideo.style.transform = 'none';
+
+                        // 初始化音频分析器
+                        this.initializeAudioAnalyzer();
+                    }
+                    if (this.localStream) {
+                        localVideo.srcObject = this.localStream;
+                        localVideo.style.transform = 'scaleX(-1)';
+                    }
+                },
+                initializeAudioAnalyzer() {
+                    try {
+                        // 创建音频上下文和分析器
+                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        this.analyser = this.audioContext.createAnalyser();
+                        this.analyser.fftSize = 256;
+                        this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
+                        // 获取remoteVideo的音频轨道
+                        if (this.remoteStream) {
+                            const audioTracks = this.remoteStream.getAudioTracks();
+                            if (audioTracks.length > 0) {
+                                const source = this.audioContext.createMediaStreamSource(this.remoteStream);
+                                source.connect(this.analyser);
+                                console.log('音频分析器初始化成功');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('初始化音频分析器失败:', error);
+                    }
+                },
+                playMusicUrl(url) {
+                    try {
+                        if (this.currentAudio) {
+                            this.currentAudio.pause();
+                            this.currentAudio.currentTime = 0;
+                            this.currentAudio = null;
+                        }
+                        const audio = new Audio(url);
+                        audio.crossOrigin = 'anonymous';
+                        audio.volume = 0.8;
+                        this.currentAudio = audio;
+                        audio.play().catch(() => { this.currentAudio = null; });
+                        audio.addEventListener('ended', () => { if (this.currentAudio === audio) { this.currentAudio = null; } });
+                        audio.addEventListener('error', () => { if (this.currentAudio === audio) { this.currentAudio = null; } });
+                    } catch (error) {
+                        console.error('Error creating audio:', error);
+                    }
+                },
+
+                stopMusic() {
+                    try {
+                        if (this.currentAudio) {
+                            this.currentAudio.pause();
+                            this.currentAudio.currentTime = 0;
+                            this.currentAudio.src = '';
+                            this.currentAudio.load();
+                            this.currentAudio = null;
+                        }
+                    } catch (error) {
+                        console.error('Error stopping audio:', error);
+                    }
+                },
+
+                // 触摸拖拽事件处理
+                handleTouchStart(event) {
+                    event.preventDefault();
+                    const touch = event.touches[0];
+                    this.startDrag(touch.clientX, touch.clientY);
+                },
+
+                handleTouchMove(event) {
+                    if (!this.isDragging) return;
+                    event.preventDefault();
+                    const touch = event.touches[0];
+                    this.updateDrag(touch.clientX, touch.clientY);
+                },
+
+                handleTouchEnd(event) {
+                    event.preventDefault();
+                    this.endDrag();
+                },
+
+                // 鼠标拖拽事件处理（用于桌面端测试）
+                handleMouseDown(event) {
+                    event.preventDefault();
+                    this.startDrag(event.clientX, event.clientY);
+                    document.addEventListener('mousemove', this.handleDocumentMouseMove);
+                    document.addEventListener('mouseup', this.handleDocumentMouseUp);
+                },
+
+                handleMouseMove(event) {
+                    if (!this.isDragging) return;
+                    event.preventDefault();
+                    this.updateDrag(event.clientX, event.clientY);
+                },
+
+                handleMouseUp(event) {
+                    event.preventDefault();
+                    this.endDrag();
+                },
+
+                handleDocumentMouseMove(event) {
+                    if (!this.isDragging) return;
+                    this.updateDrag(event.clientX, event.clientY);
+                },
+
+                handleDocumentMouseUp() {
+                    this.endDrag();
+                    document.removeEventListener('mousemove', this.handleDocumentMouseMove);
+                    document.removeEventListener('mouseup', this.handleDocumentMouseUp);
+                },
+
+                // 拖拽核心逻辑
+                startDrag(clientX, clientY) {
+                    this.isDragging = true;
+                    const video = this.$refs.localVideo;
+                    if (!video) return;
+
+                    const rect = video.getBoundingClientRect();
+                    this.dragStart = { x: clientX, y: clientY };
+                    this.videoOffset = {
+                        x: clientX - rect.left,
+                        y: clientY - rect.top
+                    };
+                },
+
+                updateDrag(clientX, clientY) {
+                    if (!this.isDragging) return;
+
+                    const video = this.$refs.localVideo;
+                    if (!video) return;
+
+                    // 计算新位置
+                    let newX = clientX - this.videoOffset.x;
+                    let newY = clientY - this.videoOffset.y;
+
+                    // 获取视频尺寸
+                    const videoRect = video.getBoundingClientRect();
+                    const videoWidth = videoRect.width;
+                    const videoHeight = videoRect.height;
+
+                    // 获取窗口尺寸
+                    const windowWidth = window.innerWidth;
+                    const windowHeight = window.innerHeight;
+
+                    // 边界约束
+                    newX = Math.max(0, Math.min(newX, windowWidth - videoWidth));
+                    newY = Math.max(0, Math.min(newY, windowHeight - videoHeight));
+
+                    // 更新位置
+                    this.videoPosition = { x: newX, y: newY };
+                },
+
+                endDrag() {
+                    this.isDragging = false;
+                },
+
+                // 设置初始视频位置
+                setInitialVideoPosition() {
+                    // 检查是否为移动设备
+                    const isMobile = window.innerWidth <= 768;
+
+                    if (isMobile) {
+                        // 手机端：默认位置在右上角
+                        this.videoPosition = {
+                            x: window.innerWidth - 135 - 16,
+                            y: 16
+                        };
+                    } else {
+                        // 桌面端：默认位置在左下角
+                        this.videoPosition = {
+                            x: 16,
+                            y: window.innerHeight - 135 - 16
+                        };
+                    }
+                },
+
+                // 处理窗口大小变化
+                handleWindowResize() {
+                    this.constrainVideoPosition();
+                },
+
+                // 处理屏幕方向变化
+                handleOrientationChange() {
+                    // 延迟处理，等待方向变化完成
+                    setTimeout(() => {
+                        this.constrainVideoPosition();
+                    }, 100);
+                },
+
+                // 约束视频位置在窗口边界内
+                constrainVideoPosition() {
+                    const video = this.$refs.localVideo;
+                    if (!video) return;
+
+                    const videoRect = video.getBoundingClientRect();
+                    const videoWidth = videoRect.width;
+                    const videoHeight = videoRect.height;
+
+                    const windowWidth = window.innerWidth;
+                    const windowHeight = window.innerHeight;
+
+                    let newX = this.videoPosition.x;
+                    let newY = this.videoPosition.y;
+
+                    // 边界约束
+                    newX = Math.max(0, Math.min(newX, windowWidth - videoWidth));
+                    newY = Math.max(0, Math.min(newY, windowHeight - videoHeight));
+
+                    // 更新位置
+                    this.videoPosition = { x: newX, y: newY };
+                },
+
+                // 消息容器触摸事件处理
+                handleMessageContainerTouchStart(event) {
+                    this.isMessageContainerTouching = true;
+                    this.isVerticalScrolling = false;
+                    const touch = event.touches[0];
+                    this.messageScrollStartY = touch.clientY;
+                    this.messageScrollStartX = touch.clientX;
+                    this.messageScrollStartTime = Date.now();
+
+                    // 不阻止事件冒泡，让全局处理器也能接收到开始事件
+                },
+
+                handleMessageContainerTouchMove(event) {
+                    if (!this.isMessageContainerTouching) return;
+
+                    const touch = event.touches[0];
+                    const deltaY = touch.clientY - this.messageScrollStartY;
+                    const deltaX = touch.clientX - this.messageScrollStartX;
+
+                    // 判断用户意图：如果垂直移动距离大于水平移动距离，则认为是垂直滚动
+                    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) {
+                        this.isVerticalScrolling = true;
+                        // 只有在垂直滚动时才阻止事件冒泡
+                        event.stopPropagation();
+                    }
+                    // 如果是水平滑动，不阻止事件冒泡，让全局滑动手势处理
+                },
+
+                handleMessageContainerTouchEnd(event) {
+                    this.isMessageContainerTouching = false;
+                    this.isVerticalScrolling = false;
+                    // 不阻止事件冒泡，让全局处理器也能处理结束事件
+                },
+
+                // 全局滑动手势处理
+                handleGlobalTouchStart(event) {
+                    // 如果正在拖拽视频，不处理滑动手势
+                    if (this.isDragging) return;
+
+                    const touch = event.touches[0];
+                    this.swipeStartX = touch.clientX;
+                    this.swipeStartY = touch.clientY;
+                    this.swipeStartTime = Date.now();
+                    this.isSwipeGesture = false;
+                },
+
+                handleGlobalTouchMove(event) {
+                    // 如果正在拖拽视频或正在垂直滚动，不处理滑动手势
+                    if (this.isDragging || this.isVerticalScrolling) return;
+
+                    const touch = event.touches[0];
+                    const deltaX = touch.clientX - this.swipeStartX;
+                    const deltaY = touch.clientY - this.swipeStartY;
+
+                    // 检查是否是水平滑动手势（水平距离大于垂直距离）
+                    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+                        this.isSwipeGesture = true;
+                        event.preventDefault(); // 防止页面滚动
+                    }
+                },
+
+                handleGlobalTouchEnd(event) {
+                    // 如果正在拖拽视频或正在垂直滚动，不处理滑动手势
+                    if (this.isDragging || this.isVerticalScrolling || !this.isSwipeGesture) return;
+
+                    const touch = event.changedTouches[0];
+                    const deltaX = touch.clientX - this.swipeStartX;
+                    const deltaY = touch.clientY - this.swipeStartY;
+                    const deltaTime = Date.now() - this.swipeStartTime;
+
+                    // 检查是否满足滑动条件
+                    if (Math.abs(deltaX) > this.minSwipeDistance &&
+                        deltaTime < this.maxSwipeTime &&
+                        Math.abs(deltaX) > Math.abs(deltaY)) {
+
+                        if (deltaX > 0) {
+                            // 右滑：隐藏消息容器
+                            this.isMessageHidden = true;
+                        } else {
+                            // 左滑：显示消息容器
+                            this.isMessageHidden = false;
+                        }
+                    }
+
+                    this.isSwipeGesture = false;
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

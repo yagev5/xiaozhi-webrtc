@@ -1,34 +1,74 @@
 import asyncio
 import json
+import logging
 import os
 
 import cv2
 from aiohttp import web
-from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
 from xiaozhi_sdk import XiaoZhiWebsocket
 
 from src.config import DEFAULT_MAC_ADDR, OTA_URL
 from src.track.audio import AudioFaceSwapper
 from src.track.video import VideoFaceSwapper
 
+# 设置 logger
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# 禁用 aioice.ice 模块的日志输出
+logging.getLogger('aioice.ice').setLevel(logging.WARNING)
+
 ROOT = os.path.dirname(__file__)
 
 
-# logging.basicConfig(level=logging.INFO)
+def get_client_ip(request):
+    """
+    获取客户端真实IP地址
+    按优先级尝试多种方式获取，确保在各种部署环境下都能正确获取IP
+    """
+    # 1. X-Real-IP: 反向代理设置的真实IP (Nginx, Apache等)
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip and real_ip != "unknown":
+        return real_ip
+
+    # 2. X-Forwarded-For: 代理链中的IP列表，取第一个
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # 可能有多个IP，用逗号分隔，取第一个
+        first_ip = forwarded_for.split(",")[0].strip()
+        if first_ip and first_ip != "unknown":
+            return first_ip
+
+    # 3. CF-Connecting-IP: Cloudflare设置的真实IP
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip and cf_ip != "unknown":
+        return cf_ip
+
+    # 4. X-Client-IP: 某些代理使用的头
+    client_ip = request.headers.get("X-Client-IP")
+    if client_ip and client_ip != "unknown":
+        return client_ip
+
+    return "unknown"
 
 
 async def index(request):
     content = open(os.path.join(ROOT, "index.html"), "r", encoding="utf-8").read()
     return web.Response(content_type="text/html", text=content)
 
-async def test(request):
-    content = open(os.path.join(ROOT, "indexv2.html"), "r", encoding="utf-8").read()
+
+async def chatv2(request):
+    content = open(os.path.join(ROOT, "chatv2.html"), "r", encoding="utf-8").read()
     return web.Response(content_type="text/html", text=content)
 
 
-
-async def main_page(request):
-    content = open(os.path.join(ROOT, "index_main.html"), "r", encoding="utf-8").read()
+async def chat(request):
+    content = open(os.path.join(ROOT, "chat.html"), "r", encoding="utf-8").read()
     return web.Response(content_type="text/html", text=content)
 
 
@@ -36,20 +76,21 @@ async def offer(request):
     params = await request.json()
     _offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
-    pc = RTCPeerConnection()
+    # 使用优化的ICE配置（禁用STUN服务器，适用于直连场景）
+    configuration = RTCConfiguration(iceServers=[])
+    pc = RTCPeerConnection(configuration=configuration)
     pcs.add(pc)
 
     # Store client IP in the peer connection object
-    pc.client_ip = request.headers.get("X-Real-IP", "")
+    # 使用改进的IP获取函数
+    pc.client_ip = get_client_ip(request)
     pc.mac_address = params.get("macAddress") or DEFAULT_MAC_ADDR
 
     await server(pc, _offer)
 
     return web.Response(
         content_type="application/json",
-        text=json.dumps(
-            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
-        ),
+        text=json.dumps({"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}),
     )
 
 
@@ -63,28 +104,24 @@ async def server(pc, offer):
     channel = pc.createDataChannel("chat")
 
     async def message_handler_callback(message):
-        print("Received message:", pc.client_ip, message)
+        logger.info("Received message: %s %s %s", pc.mac_address, pc.client_ip, message)
         channel.send(json.dumps(message, ensure_ascii=False))
         if message["type"] == "llm":
             pc.video_track.set_emoji(message["text"])
 
-    xiaozhi = XiaoZhiWebsocket(
-        message_handler_callback, ota_url=OTA_URL, audio_sample_rate=48000, audio_channels=2
-    )
+    xiaozhi = XiaoZhiWebsocket(message_handler_callback, ota_url=OTA_URL, audio_sample_rate=48000, audio_channels=2)
 
     def mcp_tool_func():
         def tool_set_volume(data):
-            channel.send(
-                json.dumps(
-                    {"type": "tool", "text": "set_volume", "value": data["volume"]}
-                )
-            )
+            channel.send(json.dumps({"type": "tool", "text": "set_volume", "value": data["volume"]}))
             return "", False
 
         def tool_open_tab(data):
-            channel.send(
-                json.dumps({"type": "tool", "text": "open_tab", "value": data["url"]})
-            )
+            channel.send(json.dumps({"type": "tool", "text": "open_tab", "value": data["url"]}))
+            return "", False
+
+        def tool_stop_music(data):
+            channel.send(json.dumps({"type": "tool", "text": "stop_music"}))
             return "", False
 
         def tool_get_device_status(data):
@@ -106,21 +143,39 @@ async def server(pc, offer):
             img_byte = img_byte.tobytes()
             return img_byte, False
 
-        return {
-            "set_volume": tool_set_volume,
-            "get_device_status": tool_get_device_status,
-            "take_photo": tool_take_photo,
-            "open_tab": tool_open_tab,
-        }
+        from xiaozhi_sdk.utils.mcp_tool import (
+            get_device_status,
+            open_tab,
+            play_custom_music,
+            search_custom_music,
+            set_volume,
+            stop_music,
+            take_photo,
+        )
 
-    print("MAC: ", pc.mac_address, "IP: ", pc.client_ip)
+        take_photo["tool_func"] = tool_take_photo
+        get_device_status["tool_func"] = tool_get_device_status
+        set_volume["tool_func"] = tool_set_volume
+        open_tab["tool_func"] = tool_open_tab
+        stop_music["tool_func"] = tool_stop_music
 
-    await xiaozhi.set_mcp_tool_callback(mcp_tool_func())
+        return [
+            take_photo,
+            get_device_status,
+            set_volume,
+            take_photo,
+            open_tab,
+            stop_music,
+            search_custom_music,
+            play_custom_music,
+        ]
+
+    await xiaozhi.set_mcp_tool(mcp_tool_func())
     await xiaozhi.init_connection(pc.mac_address)
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
-        print("Connection state is {} {}".format(pc.connectionState, pc.client_ip))
+        logger.info("Connection state is %s %s %s", pc.connectionState, pc.mac_address, pc.client_ip)
         if pc.connectionState in ["failed", "closed", "disconnected"]:
             # Stop all AudioFaceSwapper instances
 
@@ -158,9 +213,9 @@ def run():
     app.on_shutdown.append(on_shutdown)
 
     app.router.add_get("/", index)
-    app.router.add_get("/test", test)
+    app.router.add_get("/chat", chat)
+    app.router.add_get("/chatv2", chatv2)
 
-    app.router.add_get("/main", main_page)
     app.router.add_post("/api/offer", offer)
     app.router.add_static("/static/", path=os.path.join(ROOT, "static"), name="static")
 

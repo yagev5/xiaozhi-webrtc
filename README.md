@@ -1,27 +1,29 @@
+[![Banners](docs/images/banner.jpg)](https://github.com/dairoot/xiaozhi-webrtc)
+
 # XiaoZhi WebRTC
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-一个基于 WebRTC 实时音视频通信项目，集成了 XiaoZhi SDK 
---- 
+一个基于 **WebRTC** 的 AI 实时音视频互动项目，致力于打造你的专属、贴心且充满温度的情感伴侣。
+
+---
 
 ## ✨ 功能特性
-
-- [x] 集成 XiaoZhi 基础能力
-- [x] 实时音视频通信
-- [ ] 数字人 替换成视频或者h5（计划中）
---- 
+- **XiaoZhi 核心能力**：融合视觉多模态理解、智能问答与 MCP 控制，带来更强大的交互与处理能力。  
+- **实时音视频沟通**：超低延迟与高清体验，让交流顺畅自然。  
+- **Live2D 动态呈现**：拟真互动与沉浸式表现，提升亲和力与互动感。  
+---
 
 ## 🎯  在线体验
 
 [https://xiaozhi.dairoot.cn](https://xiaozhi.dairoot.cn)
 
-> 💡 **提示**: 由于部署在海外服务器，访问速度可能较慢
+> 💡 **提示**: 由于部署在海外服务器，访问会稍微卡顿（仅体验）
 
 https://github.com/user-attachments/assets/525cc396-15e8-48ea-bd70-492845d055db
 
---- 
+---
 
 ## 🚀 快速开始
 
@@ -65,21 +67,9 @@ pip install -e .
 # 运行项目
 python main.py
 ```
---- 
+---
 
 ## ⚙️ 部署要求
-
-### 端口要求
-
-WebRTC 需要以下端口用于实时音视频通信：
-
-| 端口 | 协议 | 用途 |
-|------|------|------|
-| 3478 | UDP | STUN 服务 |
-| 3478 / 5349 | TCP | TURN 服务 |
-| 49152–65535 | UDP | WebRTC 媒体流端口（默认） |
-
-**注意：** 确保防火墙允许这些端口的通信，特别是在生产环境中部署时。
 
 ### HTTPS 要求
 
@@ -94,6 +84,6 @@ WebRTC 需要以下端口用于实时音视频通信：
 
 **注意**: 生产环境必须使用 HTTPS，否则 WebRTC 功能将无法正常工作。
 
---- 
+---
 ## 🫡 致敬
 - 虾哥 [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 项目

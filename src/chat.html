@@ -5,6 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>XiaoZhi WebRTC - Main</title>
+    <link rel="icon" type="image/x-icon" href="static/favicon.ico">
     <script src="static/js/vue.min.js"></script>
     <style>
         body {
@@ -144,10 +145,11 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            width: 500px;
+            width: 90vw;
+            max-width: 500px;
             height: 60px;
             z-index: 200;
-            padding: 0 50px;
+            padding: 0 12px;
         }
 
         .video-control-btn {
@@ -219,6 +221,22 @@
 
         .status-indicator.speaking { color: #06ae56; }
         .status-indicator.listening { color: #2980b9; }
+
+        @media (max-width: 480px) {
+            .video-control-btn {
+                width: 44px;
+                height: 44px;
+                font-size: 18px;
+            }
+            .video-controls {
+                height: 56px;
+                padding: 0 8px;
+            }
+            .status-indicator {
+                font-size: 16px;
+                gap: 6px;
+            }
+        }
 
         .message-bubbles-container {
             position: fixed;
@@ -359,6 +377,7 @@
         new Vue({
             el: '#app',
             data: {
+                start_time: 0,
                 pc: null,
                 localStream: null,
                 remoteStream: null,
@@ -392,7 +411,16 @@
                     try {
                         this.localStream = await navigator.mediaDevices.getUserMedia({
                             video: { width: 640, height: 480 },
-                            audio: true,
+                            audio: {
+                                    echoCancellation: true,
+                                    echoCancellationType: "browser", // 使用浏览器内置回声消除，通常更稳定
+                                    noiseSuppression: true,
+                                    autoGainControl: true,
+                                    latency: 0.02, // 降低延迟到20ms
+                                    sampleRate: 48000,
+                                    sampleSize: 16,
+                                    channelCount: 1
+                                }
                         });
                     } catch (error) {
                         console.error('Error accessing media devices:', error);
@@ -409,26 +437,20 @@
                 async negotiate() {
                     try {
                         if (!this.pc) return;
+
+                        // 创建 offer
                         const offer = await this.pc.createOffer();
                         if (!this.pc) return;
+
                         await this.pc.setLocalDescription(offer);
-                        await new Promise(resolve => {
-                            if (!this.pc) return resolve();
-                            if (this.pc.iceGatheringState === 'complete') {
-                                resolve();
-                            } else {
-                                const checkState = () => {
-                                    if (!this.pc) return resolve();
-                                    if (this.pc.iceGatheringState === 'complete') {
-                                        this.pc.removeEventListener('icegatheringstatechange', checkState);
-                                        resolve();
-                                    }
-                                };
-                                this.pc.addEventListener('icegatheringstatechange', checkState);
-                            }
-                        });
+
+                        // 优化：不等待ICE收集完成，直接发送offer
+                        // 这可以显著减少连接建立时间
+
                         if (!this.pc) return;
                         this.isLoadingOffer = true;
+                        this.start_time = performance.now();
+
                         const response = await fetch('/api/offer', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -438,14 +460,17 @@
                                 macAddress: this.macAddress,
                             })
                         });
+
                         const answer = await response.json();
                         if (!this.pc) return;
+
                         await this.pc.setRemoteDescription(answer);
+
                     } catch (error) {
                         console.error('Error during negotiation:', error);
                         alert('Error during negotiation: ' + error.message);
                     } finally {
-                        this.isLoadingOffer = false;
+                        // this.isLoadingOffer = false;
                     }
                 },
                 setupDataChannel() {
@@ -468,7 +493,8 @@
                             if (data["type"] === "music") {
                                 this.playMusicUrl(data["url"]);
                             }
-                            if (data["type"] === "ws" && data["state"] === "close") {
+                            if (data["type"] === "websocket" && data["state"] === "close") {
+                                this.messages.push({"role": "assistant", "content": "连接已断开（WebSocket 已关闭）"});
                                 this.dataChannel.close();
                                 this.pc.close();
                                 this.endAndBack();
@@ -501,7 +527,15 @@
                     if (this.pc) {
                         this.stop();
                     }
-                    this.pc = new RTCPeerConnection(null);
+
+                    // 优化ICE配置：禁用STUN服务器，使用直连模式
+                    const iceConfig = {
+                        iceServers: [],  // 空数组，不使用任何STUN/TURN服务器
+                        iceCandidatePoolSize: 0,  // 不预先收集候选者
+                        iceTransportPolicy: 'all'  // 允许所有传输类型
+                    };
+
+                    this.pc = new RTCPeerConnection(iceConfig);
                     this.status = "connecting...";
                     this.setupDataChannel();
                     this.localStream.getAudioTracks().forEach(track => { this.pc.addTrack(track, this.localStream); });
@@ -513,7 +547,9 @@
                     this.pc.addEventListener('connectionstatechange', () => {
                         this.status = this.pc.connectionState;
                         if (this.pc.connectionState === 'connected') {
+                            console.log('Connection state changed to connected in', performance.now() - this.start_time, 'ms');
                             this.isConnected = true;
+                            this.isLoadingOffer = false;
                             this.$nextTick(() => { this.assignVideoStreams(); });
                         }
                     });
@@ -532,7 +568,7 @@
                 },
                 endAndBack() {
                     this.stop();
-                    window.location.href = '/';
+                    // window.location.href = '/';
                 },
                 switchVideoPosition() {
                     this.isLocalVideoMain = !this.isLocalVideoMain;
@@ -600,4 +636,3 @@
 </body>
 
 </html>
-

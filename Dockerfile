@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
-    
+
 WORKDIR /app
 
 RUN pip install uv

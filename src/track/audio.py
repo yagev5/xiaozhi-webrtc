@@ -19,9 +19,7 @@ class AudioFaceSwapper(AudioStreamTrack):
     def empty_frame(self):
         samples = np.zeros(960, dtype=np.float32)
         samples = (samples * 32767).astype(np.int16)
-        new_frame = av.AudioFrame.from_ndarray(
-            samples.reshape(1, -1), format="s16", layout="mono"
-        )
+        new_frame = av.AudioFrame.from_ndarray(samples.reshape(1, -1), format="s16", layout="mono")
         new_frame.sample_rate = self.sample_rate
         new_frame.pts = 0
         return new_frame
