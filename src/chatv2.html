@@ -392,7 +392,13 @@
                 messageScrollStartX: 0,
                 messageScrollStartTime: 0,
                 hasScrollableContent: false,
-                isVerticalScrolling: false
+                isVerticalScrolling: false,
+                // 自适应音量控制
+                adaptiveVolumeControl: true,
+                maxVolume: 0.8, // 最大音量限制，防止回声
+                volumeAdjustmentRate: 0.02, // 音量调整速率
+                echoDetectionThreshold: 0.7, // 回声检测阈值
+                lastVolumeAdjustTime: 0
             },
             mounted() {
                 this.macAddress = getQueryParam('mac');
@@ -520,10 +526,19 @@
                             video: { width: 640, height: 480 },
                             audio: {
                                     echoCancellation: true,
-                                    echoCancellationType: "browser", // 使用浏览器内置回声消除，通常更稳定
+                                    echoCancellationType: "system", // 使用系统级回声消除
                                     noiseSuppression: true,
                                     autoGainControl: true,
-                                    latency: 0.02, // 降低延迟到20ms
+                                    googEchoCancellation: true,
+                                    googAutoGainControl: true,
+                                    googNoiseSuppression: true,
+                                    googHighpassFilter: true,
+                                    googTypingNoiseDetection: true,
+                                    googAudioMirroring: false,
+                                    googEchoCancellation2: true, // 启用增强的回声消除
+                                    googDAEchoCancellation: true, // 启用数字音频回声消除
+                                    googNoiseReduction: true, // 额外的噪声抑制
+                                    latency: 0.02, // 20ms延迟以改善回声消除效果
                                     sampleRate: 48000,
                                     sampleSize: 16,
                                     channelCount: 1
@@ -637,7 +652,12 @@
                                 }
                             } else if (data["type"] === "tool") {
                                 if (data["text"] === "set_volume") {
-                                    this.$refs.remoteVideo.volume = Math.max(0, Math.min(1, data["value"] / 100));
+                                    // 应用自适应音量控制的最大音量限制
+                                    const requestedVolume = Math.max(0, Math.min(1, data["value"] / 100));
+                                    const finalVolume = this.adaptiveVolumeControl ? 
+                                        Math.min(requestedVolume, this.maxVolume) : requestedVolume;
+                                    this.$refs.remoteVideo.volume = finalVolume;
+                                    console.log(`设置音量: 请求=${requestedVolume.toFixed(2)}, 实际=${finalVolume.toFixed(2)}`);
                                 } else if (data["text"] === "open_tab") {
                                     window.open(data["value"], "_blank");
                                 } else if (data["text"] === "stop_music") {
@@ -681,7 +701,11 @@
                             this.startTalking()
                             this.isConnected = true;
                             this.isLoadingOffer = false;
-                            this.$nextTick(() => { this.assignVideoStreams(); });
+                            this.$nextTick(() => { 
+                                this.assignVideoStreams();
+                                // 启动自适应音量控制
+                                this.startAdaptiveVolumeControl();
+                            });
                         }
                     });
                     this.isStarted = true;
@@ -781,6 +805,51 @@
                     } catch (error) {
                         console.error('Error stopping audio:', error);
                     }
+                },
+
+                // 自适应音量控制
+                adjustVolumeBasedOnEcho() {
+                    if (!this.adaptiveVolumeControl || !this.$refs.remoteVideo) return;
+                    
+                    const now = Date.now();
+                    // 限制调整频率，避免过于频繁的音量变化
+                    if (now - this.lastVolumeAdjustTime < 500) return;
+                    
+                    const currentVolume = this.$refs.remoteVideo.volume;
+                    let newVolume = currentVolume;
+                    
+                    // 检测音频强度，如果过高可能导致回声
+                    if (this.analyser && this.dataArray) {
+                        this.analyser.getByteFrequencyData(this.dataArray);
+                        const average = this.dataArray.reduce((a, b) => a + b) / this.dataArray.length;
+                        const normalizedLevel = average / 255;
+                        
+                        // 如果音频强度过高，降低音量
+                        if (normalizedLevel > this.echoDetectionThreshold && currentVolume > 0.3) {
+                            newVolume = Math.max(0.3, currentVolume - this.volumeAdjustmentRate);
+                            console.log(`检测到高音频强度 (${normalizedLevel.toFixed(2)})，降低音量至 ${newVolume.toFixed(2)}`);
+                        } 
+                        // 如果音频强度适中且音量较低，适当提高音量
+                        else if (normalizedLevel < 0.4 && currentVolume < this.maxVolume) {
+                            newVolume = Math.min(this.maxVolume, currentVolume + this.volumeAdjustmentRate * 0.5);
+                        }
+                        
+                        // 应用新音量
+                        if (Math.abs(newVolume - currentVolume) > 0.01) {
+                            this.$refs.remoteVideo.volume = newVolume;
+                            this.lastVolumeAdjustTime = now;
+                        }
+                    }
+                },
+
+                // 启动自适应音量控制监控
+                startAdaptiveVolumeControl() {
+                    if (!this.adaptiveVolumeControl) return;
+                    
+                    // 每秒检查一次音量调整
+                    setInterval(() => {
+                        this.adjustVolumeBasedOnEcho();
+                    }, 1000);
                 },
 
                 // 触摸拖拽事件处理
