@@ -265,7 +265,7 @@
                 width: 280px;
                 right: 10px;
                 bottom: 10px;
-                max-height: 60%;
+                max-height: 50%;
             }
 
             .message-bubble {
@@ -286,6 +286,36 @@
             #app {
                 touch-action: pan-x pan-y; /* 允许水平和垂直平移，但防止缩放 */
             }
+        }
+
+        /* 隐藏状态的“把手”提示 */
+        .edge-handle {
+            position: fixed;
+            width: 28px;
+            height: 56px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.28);
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+            z-index: 2002;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+            opacity: 1;
+            transition: opacity 0.2s ease;
+        }
+
+        .edge-handle::before {
+            content: '‹';
+            color: #fff;
+            font-size: 22px;
+            line-height: 1;
+            opacity: 0.95;
+        }
+
+        .edge-handle.left::before {
+            content: '›';
         }
     </style>
 </head>
@@ -320,6 +350,11 @@
                        autoplay
                        :muted="true"
                        playsinline></video>
+
+                <!-- 左右隐藏时显示的把手提示（不拦截事件） -->
+                <div class="edge-handle" v-if="isEdgeHiddenLeft || isEdgeHiddenRight"
+                     :class="{ left: isEdgeHiddenLeft, right: isEdgeHiddenRight }"
+                     :style="edgeHandleStyle"></div>
             </div>
 
 
@@ -378,6 +413,13 @@
                 dragStart: { x: 0, y: 0 },
                 videoPosition: { x: 16, y: 16 },
                 videoOffset: { x: 0, y: 0 },
+                // 贴边隐藏相关
+                edgePeekWidth: 20, // 隐藏后保留在屏幕内的可抓取宽度
+                edgeSnapThreshold: 32, // 结束拖拽时吸附到边缘的阈值
+                // 把手样式尺寸
+                handleWidth: 28,
+                handleHeight: 56,
+                handleMargin: 6,
                 // 消息容器滑动手势相关状态
                 isMessageHidden: false,
                 swipeStartX: 0,
@@ -433,6 +475,36 @@
                 displayMessages() {
                     return this.messages.slice(-this.maxMessages);
                 },
+                // 是否处于左右隐藏状态（仅基于位置阈值，避免依赖 DOM 尺寸抖动）
+                isEdgeHiddenLeft() {
+                    // 只要超出左边界一点，就认为处于左侧隐藏状态，确保把手可见
+                    return this.videoPosition.x <= -1;
+                },
+                isEdgeHiddenRight() {
+                    const windowWidth = window.innerWidth || 0;
+                    const rightHiddenEdge = windowWidth - this.edgePeekWidth;
+                    return this.videoPosition.x >= rightHiddenEdge - 1;
+                },
+                edgeHandleStyle() {
+                    const video = this.$refs.localVideo;
+                    if (!video) return { display: 'none' };
+                    const rect = video.getBoundingClientRect();
+                    const videoHeight = rect.height || 0;
+                    const windowHeight = window.innerHeight || 0;
+
+                    // 仅在左右隐藏时显示
+                    if (!this.isEdgeHiddenLeft && !this.isEdgeHiddenRight) return { display: 'none' };
+
+                    const centerY = this.videoPosition.y + videoHeight / 2;
+                    let top = centerY - this.handleHeight / 2;
+                    top = Math.max(6, Math.min(top, windowHeight - this.handleHeight - 6));
+
+                    let left = this.handleMargin;
+                    if (this.isEdgeHiddenRight) {
+                        left = window.innerWidth - this.handleWidth - this.handleMargin;
+                    }
+                    return { top: top + 'px', left: left + 'px' };
+                }
             },
             watch: {
                 messages: {
@@ -934,9 +1006,14 @@
                     const windowWidth = window.innerWidth;
                     const windowHeight = window.innerHeight;
 
-                    // 边界约束
-                    newX = Math.max(0, Math.min(newX, windowWidth - videoWidth));
-                    newY = Math.max(0, Math.min(newY, windowHeight - videoHeight));
+                    // 边界约束（允许左右超出屏幕，只保留 edgePeekWidth 把手）
+                    const minX = -videoWidth + this.edgePeekWidth; // 最多隐藏到只剩把手
+                    const maxX = windowWidth - this.edgePeekWidth;  // 右侧同理
+                    const minY = 0;
+                    const maxY = windowHeight - videoHeight;
+
+                    newX = Math.max(minX, Math.min(newX, maxX));
+                    newY = Math.max(minY, Math.min(newY, maxY));
 
                     // 更新位置
                     this.videoPosition = { x: newX, y: newY };
@@ -944,6 +1021,48 @@
 
                 endDrag() {
                     this.isDragging = false;
+
+                    const video = this.$refs.localVideo;
+                    if (!video) return;
+
+                    const videoRect = video.getBoundingClientRect();
+                    const videoWidth = videoRect.width;
+                    const windowWidth = window.innerWidth;
+
+                    let { x } = this.videoPosition;
+
+                    const leftVisibleEdge = 0;
+                    const rightVisibleEdge = windowWidth - videoWidth;
+                    const leftHiddenEdge = -videoWidth + this.edgePeekWidth;
+                    const rightHiddenEdge = windowWidth - this.edgePeekWidth;
+
+                    // 根据当前位置吸附到“可见边”或“隐藏边”（把手）
+                    if (x < leftVisibleEdge) {
+                        // 左侧越界：根据与可见边距离决定吸附到可见或隐藏
+                        if (Math.abs(x - leftVisibleEdge) <= this.edgeSnapThreshold) {
+                            x = leftVisibleEdge; // 回到完全可见
+                        } else {
+                            x = leftHiddenEdge; // 吸附到隐藏位置，仅留把手
+                        }
+                    } else if (x > rightVisibleEdge) {
+                        // 右侧越界
+                        if (Math.abs(x - rightVisibleEdge) <= this.edgeSnapThreshold) {
+                            x = rightVisibleEdge; // 回到完全可见
+                        } else {
+                            x = rightHiddenEdge; // 吸附到隐藏位置
+                        }
+                    } else {
+                        // 在可视范围内（未隐藏），结束时吸附到最近的左右可见边
+                        const distanceToLeft = x - leftVisibleEdge;
+                        const distanceToRight = rightVisibleEdge - x;
+                        if (distanceToLeft <= distanceToRight) {
+                            x = leftVisibleEdge;
+                        } else {
+                            x = rightVisibleEdge;
+                        }
+                    }
+
+                    this.videoPosition = { x, y: this.videoPosition.y };
                 },
 
                 // 设置初始视频位置
@@ -994,9 +1113,14 @@
                     let newX = this.videoPosition.x;
                     let newY = this.videoPosition.y;
 
-                    // 边界约束
-                    newX = Math.max(0, Math.min(newX, windowWidth - videoWidth));
-                    newY = Math.max(0, Math.min(newY, windowHeight - videoHeight));
+                    // 边界约束（与拖拽一致，允许左右隐藏到只剩把手）
+                    const minX = -videoWidth + this.edgePeekWidth;
+                    const maxX = windowWidth - this.edgePeekWidth;
+                    const minY = 0;
+                    const maxY = windowHeight - videoHeight;
+
+                    newX = Math.max(minX, Math.min(newX, maxX));
+                    newY = Math.max(minY, Math.min(newY, maxY));
 
                     // 更新位置
                     this.videoPosition = { x: newX, y: newY };
