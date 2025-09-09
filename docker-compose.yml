@@ -6,3 +6,4 @@ services:
       - "8083:8083"
     volumes:
       - ./:/app/
+    network_mode: "host"
