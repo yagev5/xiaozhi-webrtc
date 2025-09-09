@@ -14,14 +14,12 @@ from src.track.video import VideoFaceSwapper
 
 # 设置 logger
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
 
 # 禁用 aioice.ice 模块的日志输出
-logging.getLogger('aioice.ice').setLevel(logging.WARNING)
+logging.getLogger("aioice.ice").setLevel(logging.WARNING)
 
 ROOT = os.path.dirname(__file__)
 
