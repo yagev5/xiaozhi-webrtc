@@ -77,7 +77,7 @@ python main.py
 
 ## 📖 使用说明
 
-1. **启动服务**: 运行项目后，服务将在 `http://localhost:8083` 或者 `https://yourdomain.com`  启动
+1. **启动服务**: 运行项目后，服务将在 `http://localhost:51000` 或者 `https://yourdomain.com`  启动
 2. **访问页面**: 在浏览器中打开上述地址
 3. **授权权限**: 允许浏览器访问摄像头和麦克风
 4. **开始通信**: 点击开始按钮建立 WebRTC 连接
