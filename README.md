@@ -1,4 +1,4 @@
-[![Banners](docs/images/banner.jpg)](https://github.com/dairoot/xiaozhi-webrtc)
+[![Banners](docs/images/banner.png)](https://github.com/dairoot/xiaozhi-webrtc)
 
 # XiaoZhi WebRTC
 
