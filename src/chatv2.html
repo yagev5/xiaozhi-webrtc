@@ -297,7 +297,7 @@
             background: rgba(0, 0, 0, 0.28);
             box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
             z-index: 2002;
-            pointer-events: none;
+            pointer-events: auto;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -316,6 +316,41 @@
 
         .edge-handle.left::before {
             content: '›';
+        }
+
+        /* 摄像头切换悬浮按钮 */
+        .camera-switch-btn {
+            position: fixed;
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.72);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+            z-index: 2003;
+            backdrop-filter: blur(6px);
+            transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .camera-switch-btn:active {
+            transform: scale(0.96);
+        }
+
+        .camera-switch-btn svg {
+            width: 22px;
+            height: 22px;
+            opacity: 0.95;
+        }
+
+        .camera-switch-btn.disabled {
+            opacity: 0.5;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -351,10 +386,27 @@
                        :muted="true"
                        playsinline></video>
 
+                <!-- 摄像头切换按钮（跟随本地预览视频位置） -->
+                <div class="camera-switch-btn"
+                     v-if="!(isEdgeHiddenLeft || isEdgeHiddenRight)"
+                     :style="cameraSwitchBtnStyle"
+                     @click="switchCamera"
+                     @touchend.prevent="switchCamera">
+                    <!-- 简洁循环箭头相机图标 -->
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 7H8.17L6.59 5.41C6.21 5.03 5.7 4.8 5.17 4.8H4c-1.1 0-2 .9-2 2v8.4c0 1.1.9 2 2 2h7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M15 17h.83l1.58 1.59c.38.38.89.61 1.42.61H20c1.1 0 2-.9 2-2V8.8c0-1.1-.9-2-2-2h-7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M8 12l-3 3m0 0h3m-3 0v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 12l3-3m0 0h-3m3 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+
                 <!-- 左右隐藏时显示的把手提示（不拦截事件） -->
                 <div class="edge-handle" v-if="isEdgeHiddenLeft || isEdgeHiddenRight"
                      :class="{ left: isEdgeHiddenLeft, right: isEdgeHiddenRight }"
-                     :style="edgeHandleStyle"></div>
+                     :style="edgeHandleStyle"
+                     @click="revealFromEdge"
+                     @touchend.prevent="revealFromEdge"></div>
             </div>
 
 
@@ -440,11 +492,17 @@
                 maxVolume: 0.8, // 最大音量限制，防止回声
                 volumeAdjustmentRate: 0.02, // 音量调整速率
                 echoDetectionThreshold: 0.7, // 回声检测阈值
-                lastVolumeAdjustTime: 0
+                lastVolumeAdjustTime: 0,
+                // 摄像头切换相关
+                isSwitchingCamera: false,
+                preferredFacingMode: 'user', // 'user' 前置，'environment' 后置
+                videoInputDevices: [] // 可用的视频输入设备
             },
             mounted() {
                 this.macAddress = getQueryParam('mac');
                 this.initializeMedia().then(() => {
+                    // 枚举可用摄像头
+                    this.enumerateVideoInputs();
                     this.start();
                 });
                 this.initializeLive2D();
@@ -474,6 +532,31 @@
             computed: {
                 displayMessages() {
                     return this.messages.slice(-this.maxMessages);
+                },
+                // 摄像头切换按钮位置（贴近本地预览视频右下角，且不越界）
+                cameraSwitchBtnStyle() {
+                    // 直接基于本地预览的固定定位坐标与尺寸计算，确保拖动时实时跟随
+                    const { x, y } = this.videoPosition;
+                    const video = this.$refs.localVideo;
+                    const btnSize = 44;
+                    const margin = 8;
+                    let vw, vh;
+                    if (video) {
+                        const rect = video.getBoundingClientRect();
+                        vw = rect.width;
+                        vh = rect.height;
+                    } else {
+                        // 回退：根据已知本地预览尺寸估算
+                        const isMobile = (window.innerWidth || 0) <= 768;
+                        vw = isMobile ? 135 : 240;
+                        vh = isMobile ? 240 : 135;
+                    }
+                    let left = x + vw - btnSize - margin;
+                    let top = y + vh - btnSize - margin;
+                    // 约束在视窗内
+                    left = Math.max(6, Math.min(left, window.innerWidth - btnSize - 6));
+                    top = Math.max(6, Math.min(top, window.innerHeight - btnSize - 6));
+                    return { left: left + 'px', top: top + 'px' };
                 },
                 // 是否处于左右隐藏状态（仅基于位置阈值，避免依赖 DOM 尺寸抖动）
                 isEdgeHiddenLeft() {
@@ -594,8 +677,14 @@
                 },
                 async initializeMedia() {
                     try {
+                        // 优先使用 preferredFacingMode 选择前/后摄像头
+                        const videoConstraints = {
+                            width: 640,
+                            height: 480,
+                            facingMode: this.preferredFacingMode
+                        };
                         this.localStream = await navigator.mediaDevices.getUserMedia({
-                            video: { width: 640, height: 480 },
+                            video: videoConstraints,
                             audio: {
                                     echoCancellation: true,
                                     echoCancellationType: "system", // 使用系统级回声消除
@@ -618,6 +707,67 @@
                         });
                     } catch (error) {
                         console.error('Error accessing media devices:', error);
+                    }
+                },
+                async enumerateVideoInputs() {
+                    try {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        this.videoInputDevices = devices.filter(d => d.kind === 'videoinput');
+                    } catch (e) {
+                        console.warn('枚举视频设备失败:', e);
+                    }
+                },
+                async switchCamera() {
+                    if (this.isSwitchingCamera) return;
+                    this.isSwitchingCamera = true;
+                    try {
+                        // 切换期望摄像头
+                        this.preferredFacingMode = this.preferredFacingMode === 'user' ? 'environment' : 'user';
+
+                        // 获取新的视频流（保留原音频轨）
+                        const newStream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                width: 640,
+                                height: 480,
+                                facingMode: this.preferredFacingMode
+                            },
+                            audio: false
+                        });
+
+                        const newVideoTrack = newStream.getVideoTracks()[0];
+                        if (!newVideoTrack) throw new Error('未获取到新的视频轨道');
+
+                        // 替换到 RTCPeerConnection 中现有的视频发送器
+                        const senders = this.pc ? this.pc.getSenders() : [];
+                        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                        if (videoSender) {
+                            await videoSender.replaceTrack(newVideoTrack);
+                        }
+
+                        // 替换本地预览
+                        const oldTracks = this.localStream ? this.localStream.getVideoTracks() : [];
+                        oldTracks.forEach(t => t.stop());
+                        if (this.localStream) {
+                            this.localStream.removeTrack(oldTracks[0]);
+                            this.localStream.addTrack(newVideoTrack);
+                        }
+
+                        // 更新 video 元素
+                        const localVideo = this.$refs.localVideo;
+                        if (localVideo) {
+                            localVideo.srcObject = this.localStream;
+                            // 前置镜像，后置不镜像
+                            localVideo.style.transform = this.preferredFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+                        }
+
+                        // 释放临时流中非使用的轨道
+                        newStream.getTracks().forEach(t => {
+                            if (t !== newVideoTrack) t.stop();
+                        });
+                    } catch (err) {
+                        console.error('切换摄像头失败:', err);
+                    } finally {
+                        this.isSwitchingCamera = false;
                     }
                 },
                 scrollToBottom() {
@@ -822,7 +972,8 @@
                     }
                     if (this.localStream) {
                         localVideo.srcObject = this.localStream;
-                        localVideo.style.transform = 'scaleX(-1)';
+                        // 前置镜像，后置不镜像
+                        localVideo.style.transform = this.preferredFacingMode === 'user' ? 'scaleX(-1)' : 'none';
                     }
                 },
                 initializeAudioAnalyzer() {
@@ -973,6 +1124,26 @@
                     document.removeEventListener('mouseup', this.handleDocumentMouseUp);
                 },
 
+                // 点击把手从隐藏边弹回可见边
+                revealFromEdge() {
+                    const video = this.$refs.localVideo;
+                    if (!video) return;
+
+                    const rect = video.getBoundingClientRect();
+                    const videoWidth = rect.width;
+                    const windowWidth = window.innerWidth;
+
+                    let targetX = this.videoPosition.x;
+                    if (this.isEdgeHiddenLeft) {
+                        // 从左侧隐藏恢复到左可见边
+                        targetX = 0;
+                    } else if (this.isEdgeHiddenRight) {
+                        // 从右侧隐藏恢复到右可见边
+                        targetX = windowWidth - videoWidth;
+                    }
+                    this.videoPosition = { x: targetX, y: this.videoPosition.y };
+                },
+
                 // 拖拽核心逻辑
                 startDrag(clientX, clientY) {
                     this.isDragging = true;
@@ -1088,6 +1259,8 @@
                 // 处理窗口大小变化
                 handleWindowResize() {
                     this.constrainVideoPosition();
+                    // 强制刷新以更新依赖 window 尺寸的定位
+                    this.$forceUpdate();
                 },
 
                 // 处理屏幕方向变化
@@ -1095,6 +1268,7 @@
                     // 延迟处理，等待方向变化完成
                     setTimeout(() => {
                         this.constrainVideoPosition();
+                        this.$forceUpdate();
                     }, 100);
                 },
 
