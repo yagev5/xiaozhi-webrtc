@@ -77,7 +77,8 @@ class Live2DManager {
      */
     animateMouth() {
         if (!this.isTalking) return;
-        const internal = this.live2dModel.internalModel;
+        if (!this.live2dModel) return;
+        const internal = this.live2dModel && this.live2dModel.internalModel;
         if (internal && internal.coreModel) {
             const coreModel = internal.coreModel;
 
@@ -121,7 +122,8 @@ class Live2DManager {
             cancelAnimationFrame(this.mouthAnimationId);
             this.mouthAnimationId = null;
         }
-        const internal = this.live2dModel.internalModel;
+        if (!this.live2dModel) return;
+        const internal = this.live2dModel && this.live2dModel.internalModel;
         if (internal && internal.coreModel) {
             const coreModel = internal.coreModel;
             coreModel.setParameterValueById(this.mouthParam, 0);
