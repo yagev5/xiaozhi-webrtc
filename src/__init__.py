@@ -9,6 +9,7 @@ from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
 from xiaozhi_sdk import XiaoZhiWebsocket
 
 from src.config import DEFAULT_MAC_ADDR, OTA_URL, PORT
+from src.config.ice_config import ice_config
 from src.track.audio import AudioFaceSwapper
 from src.track.video import VideoFaceSwapper
 
@@ -70,12 +71,19 @@ async def chat(request):
     return web.Response(content_type="text/html", text=content)
 
 
+async def ice(request):
+    """返回ICE服务器配置"""
+    ice_servers_config = ice_config.get_ice_config()
+    return web.Response(content_type="application/json", text=json.dumps(ice_servers_config, ensure_ascii=False))
+
+
 async def offer(request):
     params = await request.json()
     _offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
-    # 使用优化的ICE配置（禁用STUN服务器，适用于直连场景）
-    configuration = RTCConfiguration(iceServers=[])
+    # 使用动态ICE服务器配置
+    ice_servers = ice_config.get_server_ice_servers()
+    configuration = RTCConfiguration(iceServers=ice_servers)
     pc = RTCPeerConnection(configuration=configuration)
     pcs.add(pc)
 
@@ -214,6 +222,7 @@ def run():
     app.router.add_get("/chat", chat)
     app.router.add_get("/chatv2", chatv2)
 
+    app.router.add_get("/api/ice", ice)
     app.router.add_post("/api/offer", offer)
     app.router.add_static("/static/", path=os.path.join(ROOT, "static"), name="static")
 

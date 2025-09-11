@@ -523,17 +523,27 @@
                         };
                     };
                 },
-                start() {
+                async start() {
                     if (this.pc) {
                         this.stop();
                     }
 
-                    // 优化ICE配置：禁用STUN服务器，使用直连模式
-                    const iceConfig = {
-                        iceServers: [],  // 空数组，不使用任何STUN/TURN服务器
-                        iceCandidatePoolSize: 0,  // 不预先收集候选者
-                        iceTransportPolicy: 'all'  // 允许所有传输类型
-                    };
+                    // 获取服务端 ICE 配置
+                    let iceConfig = { iceServers: [], iceCandidatePoolSize: 0 };
+                    try {
+                        const resp = await fetch('/api/ice');
+                        const data = await resp.json();
+                        iceConfig = data;
+                        console.log('从服务器获取ICE配置:', iceConfig);
+                        if (!iceConfig.iceServers || iceConfig.iceServers.length === 0) {
+                            console.warn('未配置 ICE 服务器，仅支持局域网直连');
+                        } else {
+                            console.log(`已配置 ${iceConfig.iceServers.length} 个ICE服务器，支持跨NAT连接`);
+                        }
+                    } catch (e) {
+                        console.warn('获取 /api/ice 失败，使用空配置:', e);
+                        iceConfig = { iceServers: [], iceCandidatePoolSize: 0 };
+                    }
 
                     this.pc = new RTCPeerConnection(iceConfig);
                     this.status = "connecting...";

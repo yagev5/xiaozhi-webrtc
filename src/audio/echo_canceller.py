@@ -8,7 +8,7 @@ from collections import deque
 
 import numpy as np
 
-from src.echo_config import EchoConfig
+from src.config.echo_config import EchoConfig
 
 
 class EchoCanceller:
