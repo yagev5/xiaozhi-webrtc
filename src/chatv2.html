@@ -621,7 +621,7 @@
                     if (!this.hasCamera) {
                         return { display: 'none' };
                     }
-                    
+
                     // 直接基于本地预览的固定定位坐标与尺寸计算，确保拖动时实时跟随
                     const { x, y } = this.videoPosition;
                     const video = this.$refs.localVideo;
@@ -662,7 +662,7 @@
                 edgeHandleStyle() {
                     // 如果没有摄像头，直接隐藏
                     if (!this.hasCamera) return { display: 'none' };
-                    
+
                     const video = this.$refs.localVideo;
                     if (!video) return { display: 'none' };
                     const rect = video.getBoundingClientRect();
@@ -727,48 +727,48 @@
                                 height: 480,
                                 facingMode: this.preferredFacingMode
                             };
-                            
+
                             this.localStream = await navigator.mediaDevices.getUserMedia({
                                 video: videoConstraints,
                                 audio: audioConstraints
                             });
-                            
+
                             this.hasCamera = true;
                             this.audioOnlyMode = false;
                             this.cameraError = null;
-                            
+
                         } catch (videoError) {
                             console.warn('摄像头访问失败，尝试仅音频模式:', videoError);
-                            
+
                             // 尝试仅音频模式
                             try {
                                 this.localStream = await navigator.mediaDevices.getUserMedia({
                                     video: false,
                                     audio: audioConstraints
                                 });
-                                
+
                                 this.hasCamera = false;
                                 this.audioOnlyMode = true;
                                 this.cameraError = this.getCameraErrorMessage(videoError);
-                                
+
                                 // // 显示音频模式提示
                                 // this.messages.push({
                                 //     role: "assistant",
                                 //     content: `摄像头不可用（${this.cameraError}），已切换到仅音频模式`
                                 // });
-                                
+
                             } catch (audioError) {
                                 console.error('音频访问也失败:', audioError);
                                 throw audioError;
                             }
                         }
-                        
+
                     } catch (error) {
                         console.error('Error accessing media devices:', error);
                         this.cameraError = this.getCameraErrorMessage(error);
                         this.hasCamera = false;
                         this.audioOnlyMode = false;
-                        
+
                         // 显示用户友好的错误消息
                         this.showMediaError(error);
                         throw error;
@@ -803,7 +803,7 @@
                 showMediaError(error) {
                     const errorMsg = this.getCameraErrorMessage(error);
                     let userMessage = '';
-                    
+
                     switch (error.name || error.message) {
                         case 'NotAllowedError':
                         case 'PermissionDeniedError':
@@ -823,12 +823,12 @@
                         default:
                             userMessage = '媒体设备访问失败，请检查设备权限和连接状态';
                     }
-                    
+
                     this.messages.push({
                         role: "assistant",
                         content: `❌ ${userMessage}（错误：${errorMsg}）`
                     });
-                    
+
                     // 显示重试按钮（通过消息形式）
                     setTimeout(() => {
                         this.messages.push({
@@ -1056,7 +1056,7 @@
                     this.setupDataChannel();
                     // 添加音频轨道
                     this.localStream.getAudioTracks().forEach(track => { this.pc.addTrack(track, this.localStream); });
-                    
+
                     // 只在有摄像头时添加视频轨道
                     if (this.hasCamera) {
                         this.localStream.getVideoTracks().forEach(track => { this.pc.addTrack(track, this.localStream); });
@@ -1140,7 +1140,7 @@
                             this.live2dManager.initializeAudioAnalyzer(this.remoteStream);
                         }
                     }
-                    
+
                     // 只在有摄像头和本地视频元素存在时设置本地流
                     if (this.localStream && localVideo && this.hasCamera) {
                         localVideo.srcObject = this.localStream;

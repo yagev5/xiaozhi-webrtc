@@ -38,11 +38,11 @@ class AudioFaceSwapper(AudioStreamTrack):
         cleaned_pcm_data = self.echo_manager.process_microphone_audio(pcm_data)
 
         # 发送处理后的音频到服务端
-        await self.xiaozhi.send_audio(cleaned_pcm_data.tobytes())
+        await self.xiaozhi.server.send_audio(cleaned_pcm_data.tobytes())
 
         # 处理服务端返回的音频
-        if self.xiaozhi.output_audio_queue:
-            samples = self.xiaozhi.output_audio_queue.popleft()
+        if self.xiaozhi.server.output_audio_queue:
+            samples = self.xiaozhi.server.output_audio_queue.popleft()
 
             # 更新回声消除管理器的参考音频
             self.echo_manager.update_reference_audio(samples)

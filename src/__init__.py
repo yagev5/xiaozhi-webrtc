@@ -3,13 +3,12 @@ import json
 import logging
 import os
 
-import cv2
 from aiohttp import web
 from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
-from xiaozhi_sdk import XiaoZhiWebsocket
 
 from src.config import DEFAULT_MAC_ADDR, OTA_URL, PORT
 from src.config.ice_config import ice_config
+from src.server import XiaoZhiServer
 from src.track.audio import AudioFaceSwapper
 from src.track.video import VideoFaceSwapper
 
@@ -106,78 +105,8 @@ pcs = set()
 async def server(pc, offer):
     # Dictionary to store track instances
 
-    # Create data channel for text messages
-    channel = pc.createDataChannel("chat")
-
-    async def message_handler_callback(message):
-        logger.info("Received message: %s %s %s", pc.mac_address, pc.client_ip, message)
-        channel.send(json.dumps(message, ensure_ascii=False))
-        if message["type"] == "llm":
-            pc.video_track.set_emoji(message["text"])
-
-    xiaozhi = XiaoZhiWebsocket(message_handler_callback, ota_url=OTA_URL, audio_sample_rate=48000, audio_channels=2)
-
-    def mcp_tool_func():
-        def tool_set_volume(data):
-            channel.send(json.dumps({"type": "tool", "text": "set_volume", "value": data["volume"]}))
-            return "", False
-
-        def tool_open_tab(data):
-            channel.send(json.dumps({"type": "tool", "text": "open_tab", "value": data["url"]}))
-            return "", False
-
-        def tool_stop_music(data):
-            channel.send(json.dumps({"type": "tool", "text": "stop_music"}))
-            return "", False
-
-        def tool_get_device_status(data):
-            return (
-                json.dumps(
-                    {
-                        "audio_speaker": {"volume": 100},
-                        # 'screen': {'brightness': 75, 'theme': 'light'},
-                        # 'network': {'type': 'wifi', 'ssid': 'wifi名称', 'signal': 'strong'}
-                    }
-                ),
-                False,
-            )
-
-        def tool_take_photo(data):
-            img_obj = xiaozhi.video_frame.to_ndarray(format="bgr24")
-            # 直接使用 OpenCV 编码图片
-            _, img_byte = cv2.imencode(".jpg", img_obj)
-            img_byte = img_byte.tobytes()
-            return img_byte, False
-
-        from xiaozhi_sdk.utils.mcp_tool import (
-            get_device_status,
-            open_tab,
-            play_custom_music,
-            search_custom_music,
-            set_volume,
-            stop_music,
-            take_photo,
-        )
-
-        take_photo["tool_func"] = tool_take_photo
-        get_device_status["tool_func"] = tool_get_device_status
-        set_volume["tool_func"] = tool_set_volume
-        open_tab["tool_func"] = tool_open_tab
-        stop_music["tool_func"] = tool_stop_music
-
-        return [
-            take_photo,
-            get_device_status,
-            set_volume,
-            take_photo,
-            open_tab,
-            stop_music,
-            search_custom_music,
-            play_custom_music,
-        ]
-
-    await xiaozhi.set_mcp_tool(mcp_tool_func())
-    await xiaozhi.init_connection(pc.mac_address)
+    xiaozhi = XiaoZhiServer(pc)
+    await xiaozhi.start()
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
@@ -185,7 +114,7 @@ async def server(pc, offer):
         if pc.connectionState in ["failed", "closed", "disconnected"]:
             # Stop all AudioFaceSwapper instances
 
-            await xiaozhi.close()
+            await xiaozhi.server.close()
             await pc.close()
             pcs.discard(pc)
 

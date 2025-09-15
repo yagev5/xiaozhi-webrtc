@@ -46,7 +46,7 @@ class VideoFaceSwapper(VideoStreamTrack):
 
     async def recv(self):
         frame = await self.track.recv()
-        self.xiaozhi.video_frame = frame
+        self.xiaozhi.server.video_frame = frame
 
         # 使用加载的图片创建视频帧
         new_frame = VideoFrame.from_ndarray(self.image, format="bgr24")
