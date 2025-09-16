@@ -291,6 +291,12 @@
             #app {
                 touch-action: pan-x pan-y; /* 允许水平和垂直平移，但防止缩放 */
             }
+
+            /* 移动端允许 Live2D 画布接收触摸事件以支持跟手转头 */
+            #live2d-stage {
+                pointer-events: auto;
+                touch-action: none;
+            }
         }
 
         /* 隐藏状态的“把手”提示 */
@@ -1012,6 +1018,12 @@
                                     window.open("https://xiaozhi.me/console", "_blank");
                                     this.open_xiaozhi_url = false;
                                 }
+                                const motion_list = ["Flick", "FlickDown", "FlickUp", "Tap", "Tap@Body", "Flick@Body"];
+                                const motion = motion_list[Math.floor(Math.random() * motion_list.length)];
+                                if (this.live2dManager) {
+                                    this.live2dManager.motion(motion);
+                                }
+
                             } else if (data["type"] === "tool") {
                                 if (data["text"] === "set_volume") {
                                     // 应用自适应音量控制的最大音量限制
@@ -1025,6 +1037,10 @@
                                 } else if (data["text"] === "stop_music") {
                                     this.stopMusic();
                                 }
+
+                            } else if (data["type"] === "llm") {
+                                console.log("llm:", data["text"]);
+                            } else if (data["type"] === "tts") {
                             } else {
                                 console.log("unknown type:", data["type"]);
                             }

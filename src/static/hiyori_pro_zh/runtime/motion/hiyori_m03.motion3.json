@@ -5,7 +5,7 @@
 		"Fps": 30.0,
 		"Loop": true,
 		"AreBeziersRestricted": false,
-		"CurveCount": 33,
+		"CurveCount": 31,
 		"TotalSegmentCount": 169,
 		"TotalPointCount": 474,
 		"UserDataCount": 0,
@@ -650,42 +650,6 @@
 		{
 			"Target": "Parameter",
 			"Id": "ParamBrowRForm",
-			"Segments": [
-				0,
-				0,
-				1,
-				0.056,
-				0,
-				0.111,
-				0,
-				0.167,
-				0,
-				0,
-				4.2,
-				0
-			]
-		},
-		{
-			"Target": "Parameter",
-			"Id": "ParamMouthForm",
-			"Segments": [
-				0,
-				1,
-				1,
-				0.056,
-				1,
-				0.111,
-				1,
-				0.167,
-				1,
-				0,
-				4.2,
-				1
-			]
-		},
-		{
-			"Target": "Parameter",
-			"Id": "ParamMouthOpenY",
 			"Segments": [
 				0,
 				0,

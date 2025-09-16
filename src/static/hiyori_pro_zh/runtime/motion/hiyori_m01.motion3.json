@@ -5,7 +5,7 @@
 		"Fps": 30.0,
 		"Loop": true,
 		"AreBeziersRestricted": false,
-		"CurveCount": 30,
+		"CurveCount": 29,
 		"TotalSegmentCount": 135,
 		"TotalPointCount": 374,
 		"UserDataCount": 0,
@@ -600,17 +600,6 @@
 				0,
 				4.7,
 				0
-			]
-		},
-		{
-			"Target": "Parameter",
-			"Id": "ParamMouthForm",
-			"Segments": [
-				0,
-				1,
-				0,
-				4.7,
-				1
 			]
 		},
 		{

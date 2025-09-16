@@ -132,6 +132,20 @@ class Live2DManager {
     }
 
     /**
+     * 触发模型动作（Motion）
+     * @param {string} name - 动作分组名称，如 'TapBody'、'FlickUp'、'Idle' 等
+     */
+    motion(name) {
+        try {
+            if (!this.live2dModel) return;
+            // console.log("motion:", name);
+            this.live2dModel.motion(name);
+        } catch (error) {
+            console.error('触发动作失败:', error);
+        }
+    }
+
+    /**
      * 清理资源
      */
     destroy() {
