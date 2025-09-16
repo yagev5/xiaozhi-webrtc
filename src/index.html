@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>XiaoZhi WebRTC - Start</title>
     <link rel="icon" type="image/x-icon" href="static/favicon.ico">
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#1976d2">
     <script src="static/js/vue.min.js"></script>
     <style>
         body {
@@ -257,6 +259,13 @@
     </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/static/service-worker.js').catch(function (e) {
+                    console.log('ServiceWorker registration failed:', e);
+                });
+            });
+        }
         new Vue({
             el: '#app',
             data: {
