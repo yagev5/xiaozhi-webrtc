@@ -17,12 +17,12 @@ class XiaoZhiServer(object):
 
     async def message_handler_callback(self, message):
         logger.info("Received message: %s %s %s", self.pc.mac_address, self.pc.client_ip, message)
-        # if message["type"] == "websocket" and message["state"] == "close":
-        #     await self.start()
-        #     return
+        if message["type"] == "websocket" and message["state"] == "close":
+            await self.server.close()
+            self.server = None
 
         self.channel.send(json.dumps(message, ensure_ascii=False))
-        if message["type"] == "llm":
+        if message["type"] == "llm" and hasattr(self.pc, "video_track"):
             self.pc.video_track.set_emoji(message["text"])
 
     async def start(self):

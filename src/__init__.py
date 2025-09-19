@@ -108,13 +108,42 @@ async def server(pc, offer):
     xiaozhi = XiaoZhiServer(pc)
     await xiaozhi.start()
 
+    # 监听来自客户端的 DataChannel
+    @pc.on("datachannel")
+    def on_datachannel(channel):
+
+        @channel.on("message")
+        async def on_message(message):
+            logger.info("收到客户端消息 [%s %s]: %s", pc.mac_address, pc.client_ip, message)
+            if xiaozhi.server is None:
+                await xiaozhi.start()
+
+            if xiaozhi.server.output_audio_queue:
+                return
+            message = json.loads(message)
+
+            send_text_dict = {
+                "doublehit": {
+                    "Head": "拍了拍你的头",
+                    "Face": "拍了拍你的脸",
+                    "Body": "拍了拍你的身体",
+                },
+                "swipe": {
+                    "Head": "摸了摸你的头",
+                    "Face": "摸了摸你的脸",
+                },
+            }
+            send_text = send_text_dict.get(message.get("event", ""), {}).get(message.get("area", ""), "")
+            if send_text:
+                await xiaozhi.server.send_wake_word(send_text)
+
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         logger.info("Connection state is %s %s %s", pc.connectionState, pc.mac_address, pc.client_ip)
         if pc.connectionState in ["failed", "closed", "disconnected"]:
             # Stop all AudioFaceSwapper instances
-
-            await xiaozhi.server.close()
+            if xiaozhi.server:
+                await xiaozhi.server.close()
             await pc.close()
             pcs.discard(pc)
 

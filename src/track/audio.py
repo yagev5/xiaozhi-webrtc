@@ -30,6 +30,9 @@ class AudioFaceSwapper(AudioStreamTrack):
         return new_frame
 
     async def recv(self):
+        if not self.xiaozhi.server:
+            return self.empty_frame()
+
         # 接收原始音频帧
         original_frame = await self.track.recv()
         pcm_data = np.frombuffer(original_frame.planes[0], dtype=np.int16)
@@ -40,8 +43,11 @@ class AudioFaceSwapper(AudioStreamTrack):
         # 发送处理后的音频到服务端
         await self.xiaozhi.server.send_audio(cleaned_pcm_data.tobytes())
 
+        if not self.xiaozhi.server:
+            return self.empty_frame()
+
         # 处理服务端返回的音频
-        if self.xiaozhi.server.output_audio_queue:
+        if self.xiaozhi.server and self.xiaozhi.server.output_audio_queue:
             samples = self.xiaozhi.server.output_audio_queue.popleft()
 
             # 更新回声消除管理器的参考音频
