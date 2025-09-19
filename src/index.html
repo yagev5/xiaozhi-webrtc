@@ -163,6 +163,82 @@
             font-weight: 500;
         }
 
+        .microphone-section {
+            margin-top: 1.5rem;
+        }
+
+        .speaker-section {
+            margin-top: 1.5rem;
+        }
+
+        .microphone-select {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(33, 150, 243, 0.3);
+            color: #000;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1rem;
+            padding-right: 3rem;
+        }
+
+        .microphone-select:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 1);
+            border-color: #2196f3;
+        }
+
+        .microphone-select option {
+            background: #fff;
+            color: #000;
+            padding: 0.5rem;
+        }
+
+        .push-to-talk-section {
+            margin-top: 1.5rem;
+        }
+
+        .voice-mode-options {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .voice-mode-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: background 0.2s ease;
+        }
+
+        .voice-mode-option:hover {
+            background: rgba(33, 150, 243, 0.1);
+        }
+
+        .voice-mode-radio {
+            width: 16px;
+            height: 16px;
+            accent-color: #2196f3;
+        }
+
+        .voice-mode-label {
+            color: #000;
+            font-size: 0.9rem;
+            font-weight: 400;
+        }
+
         .initial-actions {
             margin-top: 1.5rem;
         }
@@ -195,6 +271,85 @@
             font-size: 1.2rem;
         }
 
+        /* Settings button */
+        .settings-button {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid rgba(33, 150, 243, 0.3);
+            color: #000;
+            padding: 0.6rem 0.9rem;
+            border-radius: 999px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 4px 16px rgba(33, 150, 243, 0.25);
+        }
+
+        .settings-button:hover {
+            background: rgba(255, 255, 255, 1);
+            border-color: #2196f3;
+        }
+
+        /* Settings modal/panel */
+        .settings-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.25);
+            z-index: 1100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .settings-panel {
+            margin: 0 16px;
+            width: 420px;
+            max-width: calc(100% - 32px);
+            background: #ffffff;
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(33, 150, 243, 0.25);
+            padding: 1.25rem;
+        }
+
+        .settings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .settings-title {
+            color: #000;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .settings-close {
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #000;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        .settings-close:hover {
+            background: rgba(33, 150, 243, 0.08);
+        }
+
+        .settings-actions {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
         @media (max-width: 480px) {
             .initial-page {
                 padding: 1.5rem 1rem;
@@ -212,12 +367,77 @@
                 padding: 0.8rem 1.2rem;
                 font-size: 0.95rem;
             }
+
+            .settings-panel {
+                margin: 0 8px;
+                width: calc(100% - 16px);
+            }
+
+            .settings-button {
+                top: 10px;
+                right: 10px;
+            }
         }
     </style>
 </head>
 
 <body>
     <div id="app">
+        <button class="settings-button" @click="showSettings = true">
+            <span class="button-icon">⚙️</span>
+            <span>设置</span>
+        </button>
+
+        <div v-if="showSettings" class="settings-modal" @click.self="showSettings = false">
+            <div class="settings-panel" role="dialog" aria-modal="true" aria-label="设置">
+                <div class="settings-header">
+                    <div class="settings-title">设置</div>
+                    <button class="settings-close" @click="showSettings = false" aria-label="关闭设置">✕</button>
+                </div>
+                <div class="settings-content">
+                    <div class="microphone-section">
+                        <div class="input-label">麦克风选择</div>
+                        <select v-model="selectedAudioDeviceId" class="microphone-select" :disabled="isLoadingMicrophones">
+                            <option value="">自动选择麦克风</option>
+                            <option v-for="device in audioInputDevices"
+                                    :key="device.deviceId"
+                                    :value="device.deviceId">
+                                {{ device.label || `麦克风 ${device.deviceId.slice(0, 8)}` }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="speaker-section">
+                        <div class="input-label">扬声器选择</div>
+                        <select v-model="selectedSpeakerDeviceId" class="microphone-select" :disabled="isLoadingSpeakers">
+                            <option value="">自动选择扬声器</option>
+                            <option v-for="device in audioOutputDevices"
+                                    :key="device.deviceId"
+                                    :value="device.deviceId">
+                                {{ device.label || `扬声器 ${device.deviceId.slice(0, 8)}` }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="push-to-talk-section">
+                        <div class="input-label">语音模式</div>
+                        <div class="voice-mode-options">
+                            <label class="voice-mode-option">
+                                <input type="radio" v-model="voiceMode" value="continuous" class="voice-mode-radio">
+                                <span class="voice-mode-label">连续对话</span>
+                            </label>
+                            <label class="voice-mode-option">
+                                <input type="radio" v-model="voiceMode" value="push-to-talk" class="voice-mode-radio">
+                                <span class="voice-mode-label">按住说话</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-actions">
+                    <button class="initial-control-button" @click="showSettings = false">完成</button>
+                </div>
+            </div>
+        </div>
         <div class="initial-page">
             <div class="initial-container">
                 <div class="initial-header">
@@ -248,6 +468,8 @@
                         </div>
                     </div>
 
+
+
                     <div class="initial-actions">
                         <button class="initial-control-button" @click="goChat()" :disabled="macAddressError">
                             开始聊天
@@ -271,15 +493,54 @@
             data: {
                 macAddress: '',
                 macAddressError: false,
+                audioInputDevices: [],
+                selectedAudioDeviceId: '',
+                isLoadingMicrophones: true,
+                audioOutputDevices: [],
+                selectedSpeakerDeviceId: '',
+                isLoadingSpeakers: true,
+                voiceMode: 'continuous', // 'continuous' 或 'push-to-talk'
+                showSettings: false,
+            },
+            mounted() {
+                // 从本地存储加载设置
+                try {
+                    const savedMac = localStorage.getItem('macAddress');
+                    const savedAudio = localStorage.getItem('selectedAudioDeviceId');
+                    const savedSpeaker = localStorage.getItem('selectedSpeakerDeviceId');
+                    const savedVoiceMode = localStorage.getItem('voiceMode');
+                    if (savedMac) this.macAddress = savedMac;
+                    if (savedAudio) this.selectedAudioDeviceId = savedAudio;
+                    if (savedSpeaker) this.selectedSpeakerDeviceId = savedSpeaker;
+                    if (savedVoiceMode) this.voiceMode = savedVoiceMode;
+                    this.validateMacAddress();
+                } catch (e) { /* 忽略本地存储错误 */ }
+                this.enumerateAudioDevices();
+            },
+            watch: {
+                macAddress(newVal) {
+                    try { localStorage.setItem('macAddress', newVal || ''); } catch (e) {}
+                },
+                selectedAudioDeviceId(newVal) {
+                    try { localStorage.setItem('selectedAudioDeviceId', newVal || ''); } catch (e) {}
+                },
+                selectedSpeakerDeviceId(newVal) {
+                    try { localStorage.setItem('selectedSpeakerDeviceId', newVal || ''); } catch (e) {}
+                },
+                voiceMode(newVal) {
+                    try { localStorage.setItem('voiceMode', newVal || 'continuous'); } catch (e) {}
+                }
             },
             methods: {
                 goChat() {
-                    window.location.href = `/chatv2?mac=${this.macAddress}`;
+                    // 设置已存入 localStorage，直接跳转
+                    window.location.href = '/chatv2';
                 },
                 validateMacAddress() {
                     this.formatMacAddress();
                     const macAddressPattern = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-                    this.macAddressError = this.macAddress && !macAddressPattern.test(this.macAddress);
+                    // 确保始终为布尔值，避免出现空字符串导致按钮被视为禁用
+                    this.macAddressError = (!!this.macAddress) && !macAddressPattern.test(this.macAddress);
                 },
                 formatMacAddress() {
                     let cleaned = this.macAddress.replace(/[^0-9A-Fa-f]/g, '');
@@ -296,6 +557,48 @@
                 selectPresetMac(mac) {
                     this.macAddress = mac;
                     this.validateMacAddress();
+                },
+                async enumerateAudioDevices() {
+                    try {
+                        // 首先请求麦克风权限以获取设备标签
+                        await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        this.audioInputDevices = devices.filter(d => d.kind === 'audioinput');
+                        this.audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
+
+                        console.log('可用音频输入设备:', this.audioInputDevices.map(d => ({
+                            deviceId: d.deviceId,
+                            label: d.label || '未知设备'
+                        })));
+
+                        console.log('可用音频输出设备:', this.audioOutputDevices.map(d => ({
+                            deviceId: d.deviceId,
+                            label: d.label || '未知设备'
+                        })));
+
+                        // 如果没有选择设备且存在音频设备，选择第一个
+                        if (!this.selectedAudioDeviceId && this.audioInputDevices.length > 0) {
+                            this.selectedAudioDeviceId = this.audioInputDevices[0].deviceId;
+                        }
+
+                        if (!this.selectedSpeakerDeviceId && this.audioOutputDevices.length > 0) {
+                            this.selectedSpeakerDeviceId = this.audioOutputDevices[0].deviceId;
+                        }
+                    } catch (e) {
+                        console.warn('枚举音频设备失败:', e);
+                        // 即使权限被拒绝，也尝试枚举设备（但可能没有标签）
+                        try {
+                            const devices = await navigator.mediaDevices.enumerateDevices();
+                            this.audioInputDevices = devices.filter(d => d.kind === 'audioinput' && d.deviceId !== '');
+                            this.audioOutputDevices = devices.filter(d => d.kind === 'audiooutput' && d.deviceId !== '');
+                        } catch (enumError) {
+                            console.warn('设备枚举失败:', enumError);
+                        }
+                    } finally {
+                        this.isLoadingMicrophones = false;
+                        this.isLoadingSpeakers = false;
+                    }
                 },
             }
         });

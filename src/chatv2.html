@@ -70,7 +70,7 @@
             inset: 0;
             display: block;
             z-index: 100;
-            pointer-events: none;
+            pointer-events: auto;
         }
 
         .status-indicator {
@@ -146,6 +146,28 @@
         .message-bubbles-container:hover .scroll-indicator,
         .message-bubbles-container.scrollable .scroll-indicator {
             opacity: 1;
+        }
+
+        /* 顶部最后一条消息预览（在隐藏消息容器时显示） */
+        .top-message-preview {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 92%;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 18px 26px;
+            border-radius: 28px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+            color: #2c3e50;
+            font-size: 22px;
+            line-height: 1.5;
+            letter-spacing: 0.8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 1500;
+            pointer-events: none;
         }
 
         .message-bubble {
@@ -256,6 +278,7 @@
         /* Mobile responsive styles for local-preview */
         @media (max-width: 768px) {
             .local-preview {
+                margin-top: 50px;
                 width: 135px;
                 height: 240px;
                 cursor: grab;
@@ -271,6 +294,15 @@
                 right: 10px;
                 bottom: 10px;
                 max-height: 50%;
+            }
+
+            .top-message-preview {
+                top: 25px;
+                max-width: 95%;
+                font-size: 18px;
+                padding: 15px 20px;
+                border-radius: 24px;
+                letter-spacing: 0.7px;
             }
 
             .message-bubble {
@@ -364,6 +396,8 @@
             pointer-events: none;
         }
 
+
+
         /* 摄像头不可用时的占位符 */
         .camera-placeholder {
             position: fixed;
@@ -417,6 +451,7 @@
             .camera-placeholder .icon {
                 font-size: 28px;
             }
+
         }
 
         /* 音频模式指示器 */
@@ -440,6 +475,88 @@
 
         .audio-mode-indicator .icon {
             font-size: 14px;
+        }
+
+        /* 按住说话按钮样式 */
+        .push-to-talk-container {
+            position: fixed;
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2005;
+            pointer-events: auto;
+        }
+
+        .push-to-talk-btn {
+            width: 112px;
+            height: 112px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .push-to-talk-btn:hover {
+            background: rgba(0, 0, 0, 0.9);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .push-to-talk-btn:active,
+        .push-to-talk-btn.active {
+            background: rgba(220, 38, 38, 0.9);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: scale(0.95);
+            box-shadow: 0 2px 10px rgba(220, 38, 38, 0.5);
+        }
+
+        .push-to-talk-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 4px;
+        }
+
+        .push-to-talk-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .push-to-talk-text {
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* 移动端按住说话按钮样式调整 */
+        @media (max-width: 768px) {
+            .push-to-talk-container {
+                bottom: 18%;
+            }
+
+            .push-to-talk-btn {
+                width: 96px;
+                height: 96px;
+            }
+
+            .push-to-talk-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .push-to-talk-text {
+                font-size: 11px;
+            }
         }
     </style>
 </head>
@@ -491,6 +608,39 @@
                     </svg>
                 </div>
 
+
+                <!-- 按住说话按钮（固定在底部中央） -->
+                <div class="push-to-talk-container" v-if="voiceMode === 'push-to-talk'">
+                    <button class="push-to-talk-btn"
+                            :class="{ active: isPushToTalkActive }"
+                            @mousedown="startPushToTalk"
+                            @mouseup="stopPushToTalk"
+                            @mouseleave="stopPushToTalk"
+                            @touchstart.prevent="startPushToTalk"
+                            @touchend.prevent="stopPushToTalk"
+                            @touchcancel.prevent="stopPushToTalk">
+                        <div class="push-to-talk-icon">
+                            <svg v-if="!isPushToTalkActive" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="push-to-talk-text">
+                            {{ isPushToTalkActive ? '松开结束' : '按住说话' }}
+                        </div>
+                    </button>
+                </div>
+
+
+
                 <!-- 左右隐藏时显示的把手提示（不拦截事件） - 只在有摄像头时显示 -->
                 <div class="edge-handle" v-if="hasCamera && (isEdgeHiddenLeft || isEdgeHiddenRight)"
                      :class="{ left: isEdgeHiddenLeft, right: isEdgeHiddenRight }"
@@ -502,9 +652,15 @@
             <!-- Live2D Canvas -->
             <canvas id="live2d-stage"></canvas>
 
+            <!-- 顶部最后一条消息预览（当消息容器隐藏时显示） -->
+            <div class="top-message-preview"
+                 v-if="isMoreMessageHidden && lastMessageText">
+                {{ lastMessageText }}
+            </div>
+
             <!-- Message bubbles -->
             <div class="message-bubbles-container"
-                 :class="{ hidden: isMessageHidden, scrollable: hasScrollableContent }"
+                 :class="{ hidden: isMoreMessageHidden, scrollable: hasScrollableContent }"
                  @touchstart="handleMessageContainerTouchStart"
                  @touchmove="handleMessageContainerTouchMove"
                  @touchend="handleMessageContainerTouchEnd"
@@ -519,12 +675,9 @@
     </div>
 
     <script>
-        function getQueryParam(name) {
-            const params = new URLSearchParams(window.location.search);
-            return params.get(name) || '';
-        }
+        // URL 不再承载参数，改为从 localStorage 读取
 
-        new Vue({
+        window.chatApp = new Vue({
             el: '#app',
             data: {
                 pc: null,
@@ -546,6 +699,11 @@
                 cameraError: null,
                 hasCamera: true,
                 audioOnlyMode: false,
+                // 音频设备相关
+                audioInputDevices: [], // 可用的音频输入设备
+                selectedAudioDeviceId: '', // 当前选择的音频设备ID
+                audioOutputDevices: [], // 可用的音频输出设备
+                selectedSpeakerDeviceId: '', // 当前选择的扬声器设备ID
                 // 拖拽相关状态
                 isDragging: false,
                 dragStart: { x: 0, y: 0 },
@@ -559,7 +717,7 @@
                 handleHeight: 56,
                 handleMargin: 6,
                 // 消息容器滑动手势相关状态
-                isMessageHidden: false,
+                isMoreMessageHidden: false,
                 swipeStartX: 0,
                 swipeStartY: 0,
                 swipeStartTime: 0,
@@ -582,13 +740,30 @@
                 // 摄像头切换相关
                 isSwitchingCamera: false,
                 preferredFacingMode: 'user', // 'user' 前置，'environment' 后置
-                videoInputDevices: [] // 可用的视频输入设备
+                videoInputDevices: [], // 可用的视频输入设备
+                // 语音模式相关
+                voiceMode: 'continuous', // 'continuous' 或 'push-to-talk'
+                isPushToTalkActive: false, // 是否正在按住说话
+                audioTrackEnabled: true, // 音频轨道是否启用
+                // 触觉反馈相关
+                hasUserInteracted: false // 是否有过用户手势交互
             },
             mounted() {
-                this.macAddress = getQueryParam('mac');
+                // 从本地存储获取设置
+                try {
+                    const savedMac = localStorage.getItem('macAddress');
+                    const savedAudio = localStorage.getItem('selectedAudioDeviceId');
+                    const savedSpeaker = localStorage.getItem('selectedSpeakerDeviceId');
+                    const savedVoiceMode = localStorage.getItem('voiceMode');
+                    if (savedMac) this.macAddress = savedMac;
+                    if (savedAudio) this.selectedAudioDeviceId = savedAudio;
+                    if (savedSpeaker) this.selectedSpeakerDeviceId = savedSpeaker;
+                    if (savedVoiceMode) this.voiceMode = savedVoiceMode;
+                } catch (e) { /* 忽略本地存储错误 */ }
                 this.initializeMedia().then(() => {
-                    // 枚举可用摄像头
+                    // 枚举可用摄像头和麦克风
                     this.enumerateVideoInputs();
+                    this.enumerateAudioInputs();
                     this.start();
                 }).catch((error) => {
                     console.error('媒体初始化失败:', error);
@@ -605,10 +780,17 @@
 
                 // 添加全局滑动手势监听器（仅在移动设备上）
                 if (window.innerWidth <= 768) {
+                    this.isMoreMessageHidden = true; // 移动端默认隐藏消息容器
                     document.addEventListener('touchstart', this.handleGlobalTouchStart, { passive: false });
                     document.addEventListener('touchmove', this.handleGlobalTouchMove, { passive: false });
                     document.addEventListener('touchend', this.handleGlobalTouchEnd, { passive: false });
                 }
+
+
+                // 记录首次用户交互（避免浏览器在无用户手势时拦截震动）
+                this._onFirstUserInteract = () => { this.hasUserInteracted = true; };
+                window.addEventListener('pointerdown', this._onFirstUserInteract, { once: true, capture: true });
+                window.addEventListener('keydown', this._onFirstUserInteract, { once: true, capture: true });
             },
             beforeDestroy() {
                 // 清理事件监听器
@@ -619,10 +801,24 @@
                 document.removeEventListener('touchstart', this.handleGlobalTouchStart);
                 document.removeEventListener('touchmove', this.handleGlobalTouchMove);
                 document.removeEventListener('touchend', this.handleGlobalTouchEnd);
+
+
+                // 清理首次用户交互监听
+                if (this._onFirstUserInteract) {
+                    window.removeEventListener('pointerdown', this._onFirstUserInteract, { capture: true });
+                    window.removeEventListener('keydown', this._onFirstUserInteract, { capture: true });
+                    this._onFirstUserInteract = null;
+                }
             },
             computed: {
                 displayMessages() {
                     return this.messages.slice(-this.maxMessages);
+                },
+                lastMessageText() {
+                    const list = this.displayMessages;
+                    if (!list || list.length === 0) return '';
+                    const last = list[list.length - 1];
+                    return last && last.content ? String(last.content) : '';
                 },
                 // 摄像头切换按钮位置（贴近本地预览视频右下角，且不越界）
                 cameraSwitchBtnStyle() {
@@ -729,6 +925,11 @@
                             channelCount: 1
                         };
 
+                        // 如果指定了音频设备，添加到约束中
+                        if (this.selectedAudioDeviceId) {
+                            audioConstraints.deviceId = { exact: this.selectedAudioDeviceId };
+                        }
+
                         // 尝试获取摄像头和音频
                         try {
                             const videoConstraints = {
@@ -742,9 +943,14 @@
                                 audio: audioConstraints
                             });
 
-                            this.hasCamera = true;
-                            this.audioOnlyMode = false;
-                            this.cameraError = null;
+                        this.hasCamera = true;
+                        this.audioOnlyMode = false;
+                        this.cameraError = null;
+
+                        // 如果是按住说话模式，初始时禁用音频轨道
+                        if (this.voiceMode === 'push-to-talk') {
+                            this.disableAudioTrack();
+                        }
 
                         } catch (videoError) {
                             console.warn('摄像头访问失败，尝试仅音频模式:', videoError);
@@ -759,6 +965,11 @@
                                 this.hasCamera = false;
                                 this.audioOnlyMode = true;
                                 this.cameraError = this.getCameraErrorMessage(videoError);
+
+                                // 如果是按住说话模式，初始时禁用音频轨道
+                                if (this.voiceMode === 'push-to-talk') {
+                                    this.disableAudioTrack();
+                                }
 
                                 // // 显示音频模式提示
                                 // this.messages.push({
@@ -855,6 +1066,53 @@
                         console.warn('枚举视频设备失败:', e);
                     }
                 },
+
+                async enumerateAudioInputs() {
+                    try {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        this.audioInputDevices = devices.filter(d => d.kind === 'audioinput');
+                        this.audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
+
+                        // console.log("this.audioInputDevices", this.audioInputDevices)
+                        // console.log("this.audioOutputDevices", this.audioOutputDevices)
+
+                        // console.log('可用音频输入设备:', this.audioInputDevices.map(d => ({
+                        //     deviceId: d.deviceId,
+                        //     label: d.label || '未知设备'
+                        // })));
+
+                        // console.log('可用音频输出设备:', this.audioOutputDevices.map(d => ({
+                        //     deviceId: d.deviceId,
+                        //     label: d.label || '未知设备'
+                        // })));
+
+                        // 验证从URL参数传入的设备ID是否有效
+                        if (this.selectedAudioDeviceId) {
+                            const deviceExists = this.audioInputDevices.some(d => d.deviceId === this.selectedAudioDeviceId);
+                            if (!deviceExists) {
+                                console.warn('指定的音频输入设备不存在，将使用默认设备');
+                                this.selectedAudioDeviceId = '';
+                            }
+                        }
+
+                        // 验证从URL参数传入的扬声器设备ID是否有效
+                        if (this.selectedSpeakerDeviceId) {
+                            const deviceExists = this.audioOutputDevices.some(d => d.deviceId === this.selectedSpeakerDeviceId);
+                            if (!deviceExists) {
+                                console.warn('指定的扬声器设备不存在，将使用默认设备');
+                                this.selectedSpeakerDeviceId = '';
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('枚举音频设备失败:', e);
+                    }
+                },
+
+
+
+
+
+
                 async switchCamera() {
                     if (this.isSwitchingCamera || !this.hasCamera) return;
                     this.isSwitchingCamera = true;
@@ -919,7 +1177,7 @@
                 scrollToBottom() {
                     this.$nextTick(() => {
                         const container = document.querySelector('.message-bubbles-container');
-                        if (container && !this.isMessageHidden) {
+                        if (container && !this.isMoreMessageHidden) {
                             // 平滑滚动到底部
                             container.scrollTo({
                                 top: container.scrollHeight,
@@ -983,7 +1241,12 @@
                 },
                 setupDataChannel() {
                     this.dataChannel = this.pc.createDataChannel('chat');
-                    this.dataChannel.onopen = () => { console.log('Data channel is open'); };
+                    this.dataChannel.onopen = () => {
+                        console.log('Data channel is open');
+                        // 连接建立后发送注册信息
+                        this.dataChannel.send(JSON.stringify({type: "register", macAddress: this.macAddress}));
+
+                    };
                     this.dataChannel.onmessage = (event) => {
                         this.messages.push(event.data);
                         this.$nextTick(() => { this.scrollToBottom(); });
@@ -1005,9 +1268,9 @@
                             if (data["type"] === "websocket" && data["state"] === "close") {
 
                                 this.messages.push({"role": "assistant", "content": "连接已断开"});
-                                this.dataChannel.close();
-                                this.pc.close();
-                                this.endAndBack();
+                                // this.dataChannel.close();
+                                // this.pc.close();
+                                // this.endAndBack();
                                 return;
                             }
                             if (data["type"] === "stt") {
@@ -1018,7 +1281,16 @@
                                     window.open("https://xiaozhi.me/console", "_blank");
                                     this.open_xiaozhi_url = false;
                                 }
-                                const motion_list = ["Flick", "FlickDown", "FlickUp", "Tap", "Tap@Body", "Flick@Body"];
+                                const motion_list = [
+                                    ...Array(1).fill("Flick"),
+                                    ...Array(1).fill("FlickDown"),
+                                    ...Array(3).fill("FlickUp"),
+                                    ...Array(2).fill("Tap"),
+                                    ...Array(2).fill("Tap@Body"),
+                                    ...Array(1).fill("Flick@Body")
+                                ];
+                                // const motion_list = ["FlickUp"];
+
                                 const motion = motion_list[Math.floor(Math.random() * motion_list.length)];
                                 if (this.live2dManager) {
                                     this.live2dManager.motion(motion);
@@ -1031,6 +1303,10 @@
                                     const finalVolume = this.adaptiveVolumeControl ?
                                         Math.min(requestedVolume, this.maxVolume) : requestedVolume;
                                     this.$refs.remoteVideo.volume = finalVolume;
+
+                                    // 确保远程视频也使用选择的扬声器设备
+                                    this.applySpeakerDevice(this.$refs.remoteVideo);
+
                                     console.log(`设置音量: 请求=${requestedVolume.toFixed(2)}, 实际=${finalVolume.toFixed(2)}`);
                                 } else if (data["text"] === "open_tab") {
                                     window.open(data["value"], "_blank");
@@ -1059,7 +1335,7 @@
                         const resp = await fetch('/api/ice');
                         const data = await resp.json();
                         iceConfig = data;
-                        console.log('从服务器获取ICE配置:', iceConfig);
+                        // console.log('从服务器获取ICE配置:', iceConfig);
                         if (!iceConfig.iceServers || iceConfig.iceServers.length === 0) {
                             console.warn('未配置 ICE 服务器，仅支持局域网直连');
                         } else {
@@ -1074,7 +1350,13 @@
                     this.status = "connecting...";
                     this.setupDataChannel();
                     // 添加音频轨道
-                    this.localStream.getAudioTracks().forEach(track => { this.pc.addTrack(track, this.localStream); });
+                    this.localStream.getAudioTracks().forEach(track => {
+                        // 在按住说话模式下，初始时禁用音频轨道
+                        if (this.voiceMode === 'push-to-talk') {
+                            track.enabled = false;
+                        }
+                        this.pc.addTrack(track, this.localStream);
+                    });
 
                     // 只在有摄像头时添加视频轨道
                     if (this.hasCamera) {
@@ -1107,13 +1389,13 @@
                         }
                     });
                     this.pc.addEventListener('iceconnectionstatechange', () => {
-                        console.log('ICE connection state:', this.pc.iceConnectionState);
+                        // console.log('ICE connection state:', this.pc.iceConnectionState);
                     });
                     this.pc.addEventListener('icegatheringstatechange', () => {
-                        console.log('ICE gathering state:', this.pc.iceGatheringState);
+                        // console.log('ICE gathering state:', this.pc.iceGatheringState);
                     });
                     this.pc.addEventListener('signalingstatechange', () => {
-                        console.log('Signaling state:', this.pc.signalingState);
+                        // console.log('Signaling state:', this.pc.signalingState);
                     });
                     this.isStarted = true;
                     // 立即发起协商
@@ -1154,6 +1436,9 @@
                         remoteVideo.srcObject = this.remoteStream;
                         remoteVideo.style.transform = 'none';
 
+                        // 应用选择的扬声器设备
+                        this.applySpeakerDevice(remoteVideo);
+
                         // 初始化音频分析器
                         if (this.live2dManager) {
                             this.live2dManager.initializeAudioAnalyzer(this.remoteStream);
@@ -1177,6 +1462,10 @@
                         const audio = new Audio(url);
                         audio.crossOrigin = 'anonymous';
                         audio.volume = 0.8;
+
+                        // 应用选择的扬声器设备
+                        this.applySpeakerDevice(audio);
+
                         this.currentAudio = audio;
                         audio.play().catch(() => { this.currentAudio = null; });
                         audio.addEventListener('ended', () => { if (this.currentAudio === audio) { this.currentAudio = null; } });
@@ -1197,6 +1486,28 @@
                         }
                     } catch (error) {
                         console.error('Error stopping audio:', error);
+                    }
+                },
+
+                // 应用选择的扬声器设备到音频元素
+                applySpeakerDevice(audioElement) {
+                    if (!this.selectedSpeakerDeviceId || !audioElement) return;
+
+                    try {
+                        // 检查浏览器是否支持 setSinkId
+                        if ('setSinkId' in audioElement) {
+                            audioElement.setSinkId(this.selectedSpeakerDeviceId)
+                                .then(() => {
+                                    // console.log('扬声器设备设置成功:', this.selectedSpeakerDeviceId);
+                                })
+                                .catch((error) => {
+                                    console.warn('设置扬声器设备失败:', error);
+                                });
+                        } else {
+                            console.warn('当前浏览器不支持 setSinkId，无法指定扬声器设备');
+                        }
+                    } catch (error) {
+                        console.error('应用扬声器设备时出错:', error);
                     }
                 },
 
@@ -1547,14 +1858,87 @@
 
                         if (deltaX > 0) {
                             // 右滑：隐藏消息容器
-                            this.isMessageHidden = true;
+                            this.isMoreMessageHidden = true;
                         } else {
                             // 左滑：显示消息容器
-                            this.isMessageHidden = false;
+                            this.isMoreMessageHidden = false;
                         }
                     }
 
                     this.isSwipeGesture = false;
+                },
+
+
+                // 按住说话相关方法
+                startPushToTalk() {
+                    if (this.voiceMode !== 'push-to-talk') return;
+
+                    // 先尝试在同步手势回调中触发震动，最大化通过率
+                    if (this.canVibrateNow()) {
+                        try { navigator.vibrate(50); } catch (_) {}
+                    }
+
+                    this.isPushToTalkActive = true;
+                    this.enableAudioTrack();
+
+                    console.log('开始按住说话');
+                },
+
+                stopPushToTalk() {
+                    if (this.voiceMode !== 'push-to-talk') return;
+
+                    this.isPushToTalkActive = false;
+                    this.disableAudioTrack();
+
+                    console.log('结束按住说话');
+                },
+
+                // 启用音频轨道
+                enableAudioTrack() {
+                    if (!this.localStream) return;
+
+                    const audioTracks = this.localStream.getAudioTracks();
+                    audioTracks.forEach(track => {
+                        track.enabled = true;
+                    });
+
+                    this.audioTrackEnabled = true;
+                },
+
+                // 禁用音频轨道
+                disableAudioTrack() {
+                    if (!this.localStream) return;
+
+                    const audioTracks = this.localStream.getAudioTracks();
+                    audioTracks.forEach(track => {
+                        track.enabled = false;
+                    });
+
+                    this.audioTrackEnabled = false;
+                },
+
+                // 安全触觉反馈（避免无用户手势时被浏览器拦截）
+                safeHapticFeedback(durationMs) {
+                    try {
+                        if (!this.canVibrateNow()) return;
+                        navigator.vibrate(durationMs);
+                    } catch (e) {
+                        // 忽略震动失败
+                    }
+                },
+
+                // 判断当前是否允许震动调用（需要用户激活和焦点等）
+                canVibrateNow() {
+                    if (!('vibrate' in navigator)) return false;
+                    if (typeof navigator.userActivation === 'object' && navigator.userActivation) {
+                        // 优先使用更严格的 userActivation.isActive
+                        if (!navigator.userActivation.isActive) return false;
+                    } else {
+                        // 回退：使用我们记录的首次交互标记
+                        if (!this.hasUserInteracted) return false;
+                    }
+                    if (!document.hasFocus()) return false;
+                    return true;
                 }
             }
         });
