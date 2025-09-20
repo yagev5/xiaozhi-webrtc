@@ -21,7 +21,7 @@
 
 > 💡 **提示**: 由于部署在海外服务器，访问会稍微卡顿（仅体验）
 
-https://github.com/user-attachments/assets/525cc396-15e8-48ea-bd70-492845d055db
+https://github.com/user-attachments/assets/d985aacc-b07d-4874-a10a-c2139bd6c4bf
 
 ---
 

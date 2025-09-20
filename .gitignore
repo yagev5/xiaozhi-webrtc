@@ -5,3 +5,4 @@ __pycache__/
 
 remote_dev.sh
 build_docker_image.sh
+Caddyfile

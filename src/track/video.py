@@ -45,7 +45,10 @@ class VideoFaceSwapper(VideoStreamTrack):
         self.image = self.image_dict.get(emoji, self.image_dict["default"])
 
     async def recv(self):
+
         frame = await self.track.recv()
+        if not self.xiaozhi.server:
+            return frame
         self.xiaozhi.server.video_frame = frame
 
         # 使用加载的图片创建视频帧

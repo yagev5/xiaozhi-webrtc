@@ -746,7 +746,12 @@
                 isPushToTalkActive: false, // 是否正在按住说话
                 audioTrackEnabled: true, // 音频轨道是否启用
                 // 触觉反馈相关
-                hasUserInteracted: false // 是否有过用户手势交互
+                hasUserInteracted: false, // 是否有过用户手势交互
+                // 音频解锁与播放队列
+                audioUnlocked: false,
+                pendingMusicQueue: [],
+                hasShownAudioUnlockTip: false,
+                _audioCtx: null
             },
             mounted() {
                 // 从本地存储获取设置
@@ -787,8 +792,8 @@
                 }
 
 
-                // 记录首次用户交互（避免浏览器在无用户手势时拦截震动）
-                this._onFirstUserInteract = () => { this.hasUserInteracted = true; };
+                // 记录首次用户交互（避免浏览器在无用户手势时拦截震动），并尝试解锁音频
+                this._onFirstUserInteract = () => { this.hasUserInteracted = true; this.unlockAudio(); };
                 window.addEventListener('pointerdown', this._onFirstUserInteract, { once: true, capture: true });
                 window.addEventListener('keydown', this._onFirstUserInteract, { once: true, capture: true });
             },
@@ -1452,26 +1457,90 @@
                         localVideo.style.transform = this.preferredFacingMode === 'user' ? 'scaleX(-1)' : 'none';
                     }
                 },
+                // 解锁移动端音频播放能力，并在解锁后自动播放排队的音乐
+                unlockAudio() {
+                    if (this.audioUnlocked) return;
+                    try {
+                        // 已存在的远端音频流绑定到 WebAudio 以触发解锁
+                        if (!this._audioCtx) {
+                            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                            if (AudioCtx) {
+                                this._audioCtx = new AudioCtx();
+                            }
+                        }
+                        if (this._audioCtx && this._audioCtx.state === 'suspended') {
+                            this._audioCtx.resume().catch(() => {});
+                        }
+                        // 通过短静音播放进一步“解锁”iOS
+                        const silent = new Audio();
+                        silent.src = 'data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA';
+                        silent.volume = 0;
+                        silent.play().catch(() => {});
+
+                        this.audioUnlocked = true;
+                        this.drainPendingMusicQueue();
+                    } catch (_) {
+                        // 若失败，提示一次
+                        this.promptAudioUnlockMessageOnce();
+                    }
+                },
+                // 播放排队中的音乐
+                drainPendingMusicQueue() {
+                    if (!this.audioUnlocked) return;
+                    if (!this.pendingMusicQueue || this.pendingMusicQueue.length === 0) return;
+                    const queue = [...this.pendingMusicQueue];
+                    this.pendingMusicQueue = [];
+                    queue.forEach(url => this.playMusicUrl(url));
+                },
+                // 仅提示一次需要用户交互来解锁音频
+                promptAudioUnlockMessageOnce() {
+                    if (this.hasShownAudioUnlockTip) return;
+                    this.hasShownAudioUnlockTip = true;
+                    // this.messages.push({
+                    //     role: 'assistant',
+                    //     content: '🔊 请点击页面任意位置以启用音频播放（浏览器限制）'
+                    // });
+                    this.$nextTick(() => { this.scrollToBottom(); });
+                },
                 playMusicUrl(url) {
                     try {
+                        // 若尚未解锁，先入队，提示一次
+                        if (!this.audioUnlocked) {
+                            this.pendingMusicQueue.push(url);
+                            this.promptAudioUnlockMessageOnce();
+                            return;
+                        }
+
                         if (this.currentAudio) {
-                            this.currentAudio.pause();
-                            this.currentAudio.currentTime = 0;
+                            try { this.currentAudio.pause(); } catch (_) {}
+                            try { this.currentAudio.currentTime = 0; } catch (_) {}
                             this.currentAudio = null;
                         }
                         const audio = new Audio(url);
                         audio.crossOrigin = 'anonymous';
+                        audio.preload = 'auto';
                         audio.volume = 0.8;
 
                         // 应用选择的扬声器设备
                         this.applySpeakerDevice(audio);
 
                         this.currentAudio = audio;
-                        audio.play().catch(() => { this.currentAudio = null; });
+                        audio.play().then(() => {
+                            // ok
+                        }).catch((err) => {
+                            // iOS/Android 无用户手势时可能失败，回退到入队并提示
+                            this.currentAudio = null;
+                            this.pendingMusicQueue.push(url);
+                            this.audioUnlocked = false; // 重新等待手势解锁
+                            this.promptAudioUnlockMessageOnce();
+                            console.warn('audio.play() 被阻止，等待解锁:', err);
+                        });
                         audio.addEventListener('ended', () => { if (this.currentAudio === audio) { this.currentAudio = null; } });
                         audio.addEventListener('error', () => { if (this.currentAudio === audio) { this.currentAudio = null; } });
                     } catch (error) {
                         console.error('Error creating audio:', error);
+                        this.messages.push({ role: 'assistant', content: '🎵 音乐播放失败，请稍后重试' });
+                        this.$nextTick(() => { this.scrollToBottom(); });
                     }
                 },
 
@@ -1872,6 +1941,9 @@
                 // 按住说话相关方法
                 startPushToTalk() {
                     if (this.voiceMode !== 'push-to-talk') return;
+                    // 在用户手势的同步回调中尝试解锁音频
+                    this.unlockAudio();
+                    this.dataChannel.send(JSON.stringify({ type: "push-to-talk", state: "start" }));
 
                     // 先尝试在同步手势回调中触发震动，最大化通过率
                     if (this.canVibrateNow()) {
